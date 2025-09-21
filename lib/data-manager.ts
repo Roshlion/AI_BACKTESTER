@@ -114,7 +114,7 @@ export class DataManager {
   // Load data from local files
   async loadLocalData(ticker: string, startDate: string, endDate: string): Promise<PolygonBar[]> {
     const tempFiles = await fs.readdir(path.join(this.dataDir, 'temp'));
-    const tickerFiles = tempFiles.filter(file => file.startsWith(`${ticker}_`));
+    const tickerFiles = tempFiles.filter((file: string) => file.startsWith(`${ticker}_`));
     
     let allData: PolygonBar[] = [];
     
@@ -134,7 +134,7 @@ export class DataManager {
     const startTime = new Date(startDate).getTime();
     const endTime = new Date(endDate).getTime();
     
-    return allData.filter(bar => bar.t >= startTime && bar.t <= endTime);
+    return allData.filter((bar: PolygonBar) => bar.t >= startTime && bar.t <= endTime);
   }
 
   // Get missing data ranges
@@ -146,7 +146,7 @@ export class DataManager {
     }
 
     // Sort by timestamp
-    localData.sort((a, b) => a.t - b.t);
+    localData.sort((a: PolygonBar, b: PolygonBar) => a.t - b.t);
     
     const missingRanges: DataRange[] = [];
     const requestStart = new Date(startDate);
@@ -215,7 +215,7 @@ export class DataManager {
         newData.push(...rangeData);
         
         // Add small delay to respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve: (value: unknown) => void) => setTimeout(resolve, 100));
       } catch (error) {
         console.error(`Error downloading data for ${ticker} range ${range.start} to ${range.end}:`, error);
       }
@@ -224,11 +224,11 @@ export class DataManager {
     // Combine and deduplicate data
     const allData = [...localData, ...newData];
     const uniqueData = Array.from(
-      new Map(allData.map(bar => [bar.t, bar])).values()
+      new Map(allData.map((bar: PolygonBar) => [bar.t, bar])).values()
     );
 
     // Sort by timestamp
-    uniqueData.sort((a, b) => a.t - b.t);
+    uniqueData.sort((a: PolygonBar, b: PolygonBar) => a.t - b.t);
     
     console.log(`Total records for ${ticker}: ${uniqueData.length}`);
     return uniqueData;
