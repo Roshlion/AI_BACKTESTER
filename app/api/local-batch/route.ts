@@ -44,7 +44,6 @@ export async function POST(req: NextRequest) {
     }
 
     const buf = await openParquetBuffer(req);
-    // @ts-ignore // parquetjs-lite has no types
     const { ParquetReader } = await import("parquetjs-lite");
     const reader = await ParquetReader.openBuffer(buf);
     const cursor = reader.getCursor();
