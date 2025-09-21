@@ -7,12 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "echo \"No tests specified\" && exit 0",
+    "smoke": "node scripts/vercel-smoke.mjs",
+    "data:fetch": "node scripts/fetch-polygon-to-parquet.mjs",
+    "data:manifest": "node scripts/generate-manifest.mjs",
+    "data:stage": "node scripts/copy-to-public.mjs",
     "nasdaq-download": "node scripts/nasdaq-bulk-download.js",
     "analyze-data": "node scripts/analyze-data.js",
     "convert-parquet": "node scripts/convert-to-parquet.js",
     "test-simple": "node test-simple.js",
     "smoke:strategy": "node scripts/strategy-smoke.mjs",
-    "smoke": "node --experimental-fetch scripts/smoke-all.mjs",
+    "smoke:old": "node --experimental-fetch scripts/smoke-all.mjs",
     "smoke:base": "cross-env BASE_URL=http://localhost:3000 node --experimental-fetch scripts/smoke-all.mjs"
   },
   "dependencies": {

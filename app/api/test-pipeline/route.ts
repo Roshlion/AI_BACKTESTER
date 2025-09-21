@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const apiKey = process.env.POLYGON_API_KEY
-    
+
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'Polygon API key not configured' },
+        { ok: false, error: 'Missing POLYGON_API_KEY' },
         { status: 500 }
       )
     }
@@ -168,6 +168,7 @@ export async function GET(request: NextRequest) {
     console.log('Pipeline test completed!')
 
     return NextResponse.json({
+      ok: overallStatus === 'ALL_PASS',
       success: overallStatus === 'ALL_PASS',
       overall_status: overallStatus,
       total_tests: testResults.tests.length,
@@ -179,7 +180,8 @@ export async function GET(request: NextRequest) {
     console.error('Pipeline test failed:', error)
     
     return NextResponse.json(
-      { 
+      {
+        ok: false,
         error: 'Pipeline test failed',
         details: error instanceof Error ? error.message : 'Unknown error'
       },

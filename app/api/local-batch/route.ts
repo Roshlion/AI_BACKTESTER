@@ -1,32 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readTickerRange, getDataSource } from "@/lib/safeParquet";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-// Read parquet from Blob (PARQUET_URL) or fallback to /public/AAPL.parquet
-async function openParquetBuffer(req: NextRequest) {
-  const blobUrl = process.env.PARQUET_URL;
-  const origin =
-    (req as any).nextUrl?.origin ?? new URL(req.url).origin;
-  const src =
-    blobUrl && /^https?:\/\//i.test(blobUrl)
-      ? blobUrl
-      : `${origin}/AAPL.parquet`;
-
-  const res = await fetch(src, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to fetch parquet: ${res.status} from ${src}`);
-  return Buffer.from(await res.arrayBuffer());
-}
-
-function toISODate(rec: any): string {
-  if (typeof rec?.date === "string") return rec.date.slice(0, 10);
-  const ts = typeof rec?.timestamp === "bigint" ? Number(rec.timestamp) : Number(rec?.timestamp ?? rec?.date);
-  return new Date(ts).toISOString().slice(0, 10);
-}
-
-function toNum(v: unknown): number {
-  return typeof v === "bigint" ? Number(v) : Number(v);
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,6 +12,7 @@ export async function POST(req: NextRequest) {
       endDate: string;
     };
 
+    // Validate inputs
     if (!tickers?.length || !startDate || !endDate) {
       return NextResponse.json(
         { ok: false, error: "tickers[], startDate, endDate required" },
@@ -43,41 +20,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const buf = await openParquetBuffer(req);
-    const { ParquetReader } = await import("parquetjs-lite");
-    const reader = await ParquetReader.openBuffer(buf);
-    const cursor = reader.getCursor();
+    // Process each ticker using manifest-aware reader
+    const data = await Promise.all(
+      tickers.map(async (tickerRaw) => {
+        const ticker = tickerRaw.toUpperCase();
 
-    // Read all rows once; filter per ticker below
-    const allRows: any[] = [];
-    for (let r = await cursor.next(); r; r = await cursor.next()) allRows.push(r);
-    await reader.close();
+        try {
+          const rows = await readTickerRange(req, ticker, startDate, endDate);
 
-    // Some parquet files may not have a 'ticker' column (single-ticker files).
-    // If missing, assume it's AAPL (our demo file).
-    const hasTickerCol = allRows.length > 0 && "ticker" in allRows[0];
+          // Extract required fields for bars
+          const bars = rows.map((r) => ({
+            date: r.date,
+            close: r.close,
+            open: r.open,
+            high: r.high,
+            low: r.low,
+            volume: r.volume
+          }));
 
-    const out = tickers.map((tkRaw) => {
-      const ticker = tkRaw.toUpperCase();
-      const subset = hasTickerCol
-        ? allRows.filter((r) => (r.ticker?.toUpperCase?.() ?? r.ticker) === ticker)
-        : ticker === "AAPL"
-          ? allRows
-          : [];
+          return { ticker, bars };
+        } catch (error) {
+          console.error(`Error loading data for ${ticker}:`, error);
+          // If a ticker is absent in manifest, return its entry with bars:[]
+          return { ticker, bars: [] };
+        }
+      })
+    );
 
-      const bars = subset
-        .map((r) => ({ date: toISODate(r), close: toNum(r.close) }))
-        .filter((d) => d.date >= startDate && d.date <= endDate);
-
-      return { ticker, bars };
-    });
+    const sourceInfo = await getDataSource(req);
 
     return NextResponse.json({
       ok: true,
-      source: process.env.PARQUET_URL ? "blob" : "public",
-      data: out,
+      source: sourceInfo.source,
+      data,
     });
   } catch (e: any) {
+    console.error('Error in /api/local-batch:', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

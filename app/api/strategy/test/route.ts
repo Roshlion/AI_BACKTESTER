@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readTickerRange } from '@/lib/safeParquet'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,76 +34,53 @@ function toNum(x: unknown): number {
 
 async function readLocalBars(req: NextRequest, ticker: string, startDate: string, endDate: string): Promise<{ rows: MarketRow[], used:{start:string; end:string}, coverage:{start:string|null; end:string|null} }> {
   try {
-    const blobUrl = process.env.PARQUET_URL;
-    let src: string;
+    const allRows = await readTickerRange(req, ticker, '1900-01-01', '2099-12-31');
 
-    if (blobUrl && /^https?:\/\//i.test(blobUrl)) {
-      src = blobUrl;
-    } else {
-      const origin = (req as any).nextUrl?.origin ?? new URL(req.url).origin;
-      src = `${origin}/AAPL.parquet`;
+    if (allRows.length === 0) {
+      return { rows: [], used: { start: startDate, end: endDate }, coverage: { start: null, end: null } };
     }
 
-    const res = await fetch(src, { cache: "no-store" });
-    if (!res.ok) return { rows: [], used: { start: startDate, end: endDate }, coverage: { start: null, end: null } };
-    const buf = Buffer.from(await res.arrayBuffer());
+    // Sort by timestamp
+    const sortedRows = allRows.sort((a, b) => a.timestamp - b.timestamp);
 
-    const { ParquetReader } = await import('parquetjs-lite')
-    const reader = await ParquetReader.openBuffer(buf)
-    const cursor = reader.getCursor()
-    const raw:any[] = []
-    for (let r = await cursor.next(); r; r = await cursor.next()) raw.push(r)
-    await reader.close()
+    const covStart = sortedRows[0]?.date ?? null;
+    const covEnd = sortedRows.at(-1)?.date ?? null;
 
-    const all: MarketRow[] = raw.map((r:any) => ({
-      ticker,
-      date: toIsoDate(r.date ?? r.timestamp),
-      timestamp: toNum(r.timestamp ?? r.date),
-      open: toNum(r.open),
-      high: toNum(r.high),
-      low: toNum(r.low),
-      close: toNum(r.close),
-      volume: toNum(r.volume),
-      vwap: r.vwap != null ? Number(r.vwap) : undefined,
-      transactions: r.transactions != null ? Number(r.transactions) : undefined,
-    })).sort((a,b)=>a.timestamp-b.timestamp)
+    const reqStart = startDate || covStart || '';
+    const reqEnd = endDate || covEnd || '';
+    const usedStart = covStart ? (reqStart < covStart ? covStart : reqStart) : reqStart;
+    const usedEnd = covEnd ? (reqEnd > covEnd ? covEnd : reqEnd) : reqEnd;
 
-    const covStart = all[0]?.date ?? null
-    const covEnd   = all.at(-1)?.date ?? null
+    const rows = (usedStart && usedEnd) ? sortedRows.filter(r => r.date >= usedStart && r.date <= usedEnd) : [];
 
-    const reqStart = startDate || covStart || ''
-    const reqEnd   = endDate   || covEnd   || ''
-    const usedStart = covStart ? (reqStart < covStart ? covStart : reqStart) : reqStart
-    const usedEnd   = covEnd   ? (reqEnd   > covEnd   ? covEnd   : reqEnd)   : reqEnd
-
-    const rows = (usedStart && usedEnd) ? all.filter(r => r.date >= usedStart && r.date <= usedEnd) : []
-
-    return { rows, used: { start: usedStart, end: usedEnd }, coverage: { start: covStart, end: covEnd } }
+    return { rows, used: { start: usedStart, end: usedEnd }, coverage: { start: covStart, end: covEnd } };
   } catch (e) {
-    return { rows: [], used: { start: startDate, end: endDate }, coverage: { start: null, end: null } }
+    return { rows: [], used: { start: startDate, end: endDate }, coverage: { start: null, end: null } };
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
     const ticker = 'AAPL'
-    const startDate = '2024-01-02'
-    const endDate = '2024-03-28'
+    const startDate = '2024-01-01'
+    const endDate = '2024-03-31'
 
-    const { rows, used, coverage } = await readLocalBars(req, ticker, startDate, endDate)
+    // Use readTickerRange directly
+    const rows = await readTickerRange(req, ticker, startDate, endDate);
 
-    // If no rows, still return stable stats object
+    // If empty, return { ok:true, result:null, note:"No data" }
     if (!rows.length) {
       return NextResponse.json({
         ok: true,
-        used,
-        coverage,
+        result: null,
+        note: "No data",
         stats: { totalReturnPct: 0, trades: 0, winRatePct: 0, avgTradePct: 0 },
         trades: [],
         equity: []
       })
     }
 
+    // Ensure runBacktest(dsl, rows) gets DSL first
     const result = runBacktest(FIXED_DSL as any, rows)
 
     // Ensure stats object is always present
@@ -110,13 +88,21 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      used,
-      coverage,
-      stats: safeStats,       // <- always provided
+      result,
+      used: {
+        start: rows[0]?.date ?? startDate,
+        end: rows.at(-1)?.date ?? endDate
+      },
+      coverage: {
+        start: rows[0]?.date ?? null,
+        end: rows.at(-1)?.date ?? null
+      },
+      stats: safeStats,
       trades: result?.trades ?? [],
       equity: result?.equity ?? []
     })
   } catch (e:any) {
+    console.error('Error in /api/strategy/test:', e);
     // Keep GET stable: return ok:false but still provide stats placeholder so smoke can optionally check shape
     return NextResponse.json({
       ok: false,

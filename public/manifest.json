@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "source": "public",
+  "asOf": "2025-09-21T00:00:00Z",
+  "tickers": [
+    {
+      "ticker": "AAPL",
+      "path": "AAPL.parquet",
+      "firstDate": "2023-01-03",
+      "lastDate": "2024-12-31",
+      "records": 500
+    }
+  ]
+}
