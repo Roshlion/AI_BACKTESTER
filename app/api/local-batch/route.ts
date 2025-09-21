@@ -1,44 +1,82 @@
-import { NextRequest, NextResponse } from 'next/server'
-import path from 'node:path'
-import fs from 'node:fs/promises'
+import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// Read parquet from Blob (PARQUET_URL) or fallback to /public/AAPL.parquet
+async function openParquetBuffer(req: NextRequest) {
+  const blobUrl = process.env.PARQUET_URL;
+  const src =
+    blobUrl && /^https?:\/\//i.test(blobUrl)
+      ? blobUrl
+      : `https://${new URL(req.url).host}/AAPL.parquet`;
+
+  const res = await fetch(src, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch parquet: ${res.status} from ${src}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+function toISODate(rec: any): string {
+  if (typeof rec?.date === "string") return rec.date.slice(0, 10);
+  const ts = typeof rec?.timestamp === "bigint" ? Number(rec.timestamp) : Number(rec?.timestamp ?? rec?.date);
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+function toNum(v: unknown): number {
+  return typeof v === "bigint" ? Number(v) : Number(v);
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const { tickers, startDate, endDate } = await req.json() as { tickers:string[]; startDate:string; endDate:string }
+    const { tickers, startDate, endDate } = (await req.json()) as {
+      tickers: string[];
+      startDate: string;
+      endDate: string;
+    };
+
     if (!tickers?.length || !startDate || !endDate) {
-      return NextResponse.json({ ok:false, error:'tickers[], startDate, endDate required' }, { status:400 })
+      return NextResponse.json(
+        { ok: false, error: "tickers[], startDate, endDate required" },
+        { status: 400 }
+      );
     }
 
-    const out: { ticker:string; bars:{ date:string; close:number }[] }[] = []
+    const buf = await openParquetBuffer(req);
+    // @ts-expect-error: parquetjs-lite has no types
+    const { ParquetReader } = await import("parquetjs-lite");
+    const reader = await ParquetReader.openBuffer(buf);
+    const cursor = reader.getCursor();
 
-    for (const tkRaw of tickers) {
-      const ticker = tkRaw.toUpperCase()
-      const filePath = path.join(process.cwd(), 'data', 'parquet-final', `${ticker}.parquet`)
-      const exists = await fs.stat(filePath).then(()=>true).catch(()=>false)
-      if (!exists) { out.push({ ticker, bars: [] }); continue }
+    // Read all rows once; filter per ticker below
+    const allRows: any[] = [];
+    for (let r = await cursor.next(); r; r = await cursor.next()) allRows.push(r);
+    await reader.close();
 
-      const buf = await fs.readFile(filePath)
-      const { ParquetReader } = await import('parquetjs-lite')
-      const reader = await ParquetReader.openBuffer(buf)
-      const cursor = reader.getCursor()
-      const rows:any[] = []
-      for (let r = await cursor.next(); r; r = await cursor.next()) rows.push(r)
-      await reader.close()
+    // Some parquet files may not have a 'ticker' column (single-ticker files).
+    // If missing, assume it's AAPL (our demo file).
+    const hasTickerCol = allRows.length > 0 && "ticker" in allRows[0];
 
-      const toNum = (v: unknown): number => typeof v === 'bigint' ? Number(v) : Number(v)
-      const slim = rows.map((r:any) => ({
-        date: typeof r.date === 'string' ? r.date : new Date(Number(r.timestamp ?? r.date)).toISOString().slice(0,10),
-        close: toNum(r.close)
-      })).filter(d => d.date >= startDate && d.date <= endDate)
+    const out = tickers.map((tkRaw) => {
+      const ticker = tkRaw.toUpperCase();
+      const subset = hasTickerCol
+        ? allRows.filter((r) => (r.ticker?.toUpperCase?.() ?? r.ticker) === ticker)
+        : ticker === "AAPL"
+          ? allRows
+          : [];
 
-      out.push({ ticker, bars: slim })
-    }
+      const bars = subset
+        .map((r) => ({ date: toISODate(r), close: toNum(r.close) }))
+        .filter((d) => d.date >= startDate && d.date <= endDate);
 
-    return NextResponse.json({ ok:true, data: out })
-  } catch (e:any) {
-    return NextResponse.json({ ok:false, error:String(e) }, { status:500 })
+      return { ticker, bars };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      source: process.env.PARQUET_URL ? "blob" : "public",
+      data: out,
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
