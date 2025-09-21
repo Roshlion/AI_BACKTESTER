@@ -6,3 +6,6 @@ export type Row = {
   open: number; high: number; low: number; close: number;
   volume: number; vwap?: number; transactions?: number;
 };
+export type MarketRow = Row;
+// Alias for API routes expecting MarketRow
+export type MarketRow = Row;
