@@ -92,7 +92,7 @@ export async function GET() {
       })
     }
 
-    const result = runBacktest(rows, FIXED_DSL as any)
+    const result = runBacktest(FIXED_DSL as any, rows)
 
     // Ensure stats object is always present
     const safeStats = result?.stats ?? { totalReturnPct: 0, trades: 0, winRatePct: 0, avgTradePct: 0 }
