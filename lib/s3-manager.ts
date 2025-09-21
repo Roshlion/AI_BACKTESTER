@@ -1,4 +1,7 @@
-﻿// lib/s3-manager.ts
+﻿// NOTE: This module is unused; integration planned but not active.
+// Stub types provided for build compatibility.
+
+// lib/s3-manager.ts
 import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import fs from 'fs-extra';
 import path from 'path';
@@ -79,7 +82,7 @@ export class S3Manager {
       });
 
       const response = await this.s3Client.send(command);
-      return response.Contents?.map(obj => obj.Key!).filter(Boolean) || [];
+      return response.Contents?.map((obj: any) => obj.Key!).filter(Boolean) || [];
     } catch (error) {
       console.error('Error listing S3 files:', error);
       return [];
