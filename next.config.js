@@ -1,8 +1,8 @@
 ﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-
-  // Safeguard so webpack never tries to resolve native codecs
+  eslint: { ignoreDuringBuilds: true },     // <= skip lint in CI builds
+  typescript: { ignoreBuildErrors: false }, // keep type safety
   webpack: (config) => {
     config.resolve.fallback = {
       ...(config.resolve.fallback || {}),

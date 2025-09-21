@@ -1,5 +1,7 @@
 ﻿'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useMemo, useState } from 'react'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceDot

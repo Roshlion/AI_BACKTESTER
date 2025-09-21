@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useMemo, useState } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Bar } from 'recharts'
 import { TrendingUp, Download, Settings, Play, Database, Radio, Cloud, Beaker } from 'lucide-react'
