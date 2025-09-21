@@ -1,8 +1,9 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { TrendingUp, Download, Settings, Play, Database, Radio, Cloud } from 'lucide-react'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Bar } from 'recharts'
+import { TrendingUp, Download, Settings, Play, Database, Radio, Cloud, Beaker } from 'lucide-react'
+import Link from 'next/link'
 
 type DataSource = 'local' | 'api'
 
@@ -129,6 +130,14 @@ export default function BacktesterPage() {
         } else {
           setError('Received unexpected data format from API')
         }
+        // If the server clamped the date window, reflect it in the UI
+        if (result?.meta?.used) {
+          const used = result.meta.used
+          if (used.start && used.end) {
+            if (used.start !== startDate) setStartDate(used.start)
+            if (used.end !== endDate) setEndDate(used.end)
+          }
+        }
       } else {
         setError(result.error || 'Failed to fetch data')
       }
@@ -137,6 +146,21 @@ export default function BacktesterPage() {
     }
 
     setLoading(false)
+  }
+
+  const exportCsv = () => {
+    if (!data?.length) return;
+    const header = 'date,open,high,low,close,volume,timestamp\n';
+    const body = data
+      .map((d) => `${d.date},${d.open},${d.high},${d.low},${d.close},${d.volume},${d.timestamp}`)
+      .join('\n');
+    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${ticker}_${startDate}_${endDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const runTests = async () => {
@@ -166,6 +190,13 @@ export default function BacktesterPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableTickers.length, dataSource])
+
+  useEffect(() => {
+    if (!coverageForTicker) return;
+    const { startDate: covStart, endDate: covEnd } = coverageForTicker;
+    if (startDate < covStart) setStartDate(covStart);
+    if (endDate > covEnd) setEndDate(covEnd);
+  }, [coverageForTicker]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchData()
@@ -222,6 +253,12 @@ export default function BacktesterPage() {
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </button>
+            <Link href="/strategy" className="flex items-center px-4 py-2 border border-white/20 text-white/90 hover:text-white hover:border-white rounded-lg transition-colors">
+              <Beaker className="w-4 h-4 mr-2" /> Strategy Lab
+            </Link>
+            <Link href="/data" className="flex items-center px-4 py-2 border border-white/20 text-white/90 hover:text-white hover:border-white rounded-lg transition-colors">
+              <Database className="w-4 h-4 mr-2" /> Data Warehouse
+            </Link>
           </div>
         </div>
 
@@ -318,6 +355,8 @@ export default function BacktesterPage() {
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                min={coverageForTicker?.startDate}
+                max={coverageForTicker?.endDate}
               />
             </div>
             <div>
@@ -327,6 +366,8 @@ export default function BacktesterPage() {
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                min={coverageForTicker?.startDate}
+                max={coverageForTicker?.endDate}
               />
             </div>
             <div className="flex items-end">
@@ -395,29 +436,48 @@ export default function BacktesterPage() {
         <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-white">Price Chart</h2>
-            <button className="flex items-center px-4 py-2 border border-gray-400 text-gray-300 hover:text-white hover:border-white rounded-lg transition-colors">
+            <button
+              onClick={exportCsv}
+              disabled={!data?.length}
+              className="flex items-center px-4 py-2 border border-gray-400 text-gray-300 hover:text-white hover:border-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <Download className="w-4 h-4 mr-2" />
               Export Data
             </button>
+            <Link href="/strategy" className="flex items-center px-4 py-2 border border-white/20 text-white/90 hover:text-white hover:border-white rounded-lg transition-colors">
+              <Beaker className="w-4 h-4 mr-2" /> Strategy Lab
+            </Link>
+            <Link href="/data" className="flex items-center px-4 py-2 border border-white/20 text-white/90 hover:text-white hover:border-white rounded-lg transition-colors">
+              <Database className="w-4 h-4 mr-2" /> Data Warehouse
+            </Link>
           </div>
 
           <div className="h-96">
             {data.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1F2937',
-                      border: '1px solid #374151',
-                      borderRadius: '8px',
-                      color: '#F9FAFB',
-                    }}
+              <ResponsiveContainer width="100%" height={320}>
+                <LineChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  {/* Define both Y axes with explicit IDs */}
+                  <YAxis yAxisId="price" />
+                  <YAxis yAxisId="volume" orientation="right" />
+                  <Tooltip />
+                  <Legend />
+                  {/* Series must reference matching yAxisId */}
+                  <Line
+                    yAxisId="price"
+                    type="monotone"
+                    dataKey="close"
+                    name="Close"
+                    dot={false}
+                    strokeWidth={2}
                   />
-                  <Line type="monotone" dataKey="close" stroke="#8B5CF6" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="volume" stroke="#10B981" strokeWidth={1} dot={false} yAxisId="volume" />
+                  <Bar
+                    yAxisId="volume"
+                    dataKey="volume"
+                    name="Volume"
+                    opacity={0.3}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -509,3 +569,4 @@ export default function BacktesterPage() {
     </div>
   )
 }
+

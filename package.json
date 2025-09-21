@@ -10,28 +10,35 @@
     "nasdaq-download": "node scripts/nasdaq-bulk-download.js",
     "analyze-data": "node scripts/analyze-data.js",
     "convert-parquet": "node scripts/convert-to-parquet.js",
-    "test-simple": "node test-simple.js"
+    "test-simple": "node test-simple.js",
+    "smoke:strategy": "node scripts/strategy-smoke.mjs",
+    "smoke": "node --experimental-fetch scripts/smoke-all.mjs",
+    "smoke:base": "cross-env BASE_URL=http://localhost:3000 node --experimental-fetch scripts/smoke-all.mjs"
   },
   "dependencies": {
+    "apache-arrow": "^14.0.1",
+    "clsx": "^2.0.0",
+    "date-fns": "^4.1.0",
+    "fs-extra": "^11.3.2",
+    "lucide-react": "^0.294.0",
     "next": "14.0.4",
+    "parquetjs-lite": "^0.8.7",
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^2.8.0",
-    "lucide-react": "^0.294.0",
-    "clsx": "^2.0.0",
     "tailwind-merge": "^2.1.0",
-    "parquetjs": "^0.11.2",
-    "apache-arrow": "^14.0.1"
+    "openai": "^4.57.0"
   },
   "devDependencies": {
-    "typescript": "^5",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10",
+    "cross-env": "^7.0.3",
+    "eslint": "^8",
+    "eslint-config-next": "14.0.4",
     "postcss": "^8",
     "tailwindcss": "^3",
-    "eslint": "^8",
-    "eslint-config-next": "14.0.4"
+    "typescript": "^5"
   }
 }
