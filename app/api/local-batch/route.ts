@@ -6,10 +6,12 @@ export const dynamic = "force-dynamic";
 // Read parquet from Blob (PARQUET_URL) or fallback to /public/AAPL.parquet
 async function openParquetBuffer(req: NextRequest) {
   const blobUrl = process.env.PARQUET_URL;
+  const origin =
+    (req as any).nextUrl?.origin ?? new URL(req.url).origin;
   const src =
     blobUrl && /^https?:\/\//i.test(blobUrl)
       ? blobUrl
-      : `https://${new URL(req.url).host}/AAPL.parquet`;
+      : `${origin}/AAPL.parquet`;
 
   const res = await fetch(src, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch parquet: ${res.status} from ${src}`);

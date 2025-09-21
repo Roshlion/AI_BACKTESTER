@@ -14,9 +14,8 @@ async function openParquet(req: Request) {
   }
 
   // Fallback: read the demo file served from /public on Vercel
-  const host = new URL(req.url).host;
-  const scheme = "https";
-  const res = await fetch(`${scheme}://${host}/AAPL.parquet`, { cache: "no-store" });
+  const origin = (req as any as { nextUrl?: { origin?: string } }).nextUrl?.origin ?? new URL(req.url).origin;
+  const res = await fetch(`${origin}/AAPL.parquet`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch /AAPL.parquet: ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   return await ParquetReader.openBuffer(buf);
