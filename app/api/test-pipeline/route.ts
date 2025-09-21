@@ -2,6 +2,9 @@
 import { PolygonClient } from '@/lib/polygon'
 import { DataManager } from '@/lib/data-manager'
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const apiKey = process.env.POLYGON_API_KEY

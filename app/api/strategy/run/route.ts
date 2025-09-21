@@ -1,17 +1,27 @@
 // app/api/strategy/run/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import path from 'node:path';
-import fs from 'node:fs/promises';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Mkt = { date: string; open: number; high: number; low: number; close: number; volume: number; timestamp: number; ticker: string };
 
-async function loadLocalParquet(ticker: string, start: string, end: string): Promise<Mkt[]> {
-  const filePath = path.join(process.cwd(), 'data', 'parquet-final', `${ticker}.parquet`);
-  const buf = await fs.readFile(filePath);
+async function loadLocalParquet(req: NextRequest, ticker: string, start: string, end: string): Promise<Mkt[]> {
+  const blobUrl = process.env.PARQUET_URL;
+  let src: string;
+
+  if (blobUrl && /^https?:\/\//i.test(blobUrl)) {
+    src = blobUrl;
+  } else {
+    const origin = (req as any).nextUrl?.origin ?? new URL(req.url).origin;
+    src = `${origin}/AAPL.parquet`;
+  }
+
+  const res = await fetch(src, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch parquet: ${res.status} from ${src}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+
   const { ParquetReader } = await import('parquetjs-lite');
   const reader = await ParquetReader.openBuffer(buf);
   const cursor = reader.getCursor();
@@ -31,7 +41,7 @@ async function loadLocalParquet(ticker: string, start: string, end: string): Pro
     volume: toNum(r.volume),
   }));
 
-  return rows.filter(d => d.date >= start && d.date <= end);
+  return rows.filter(d => d.date >= start && d.date <= end && d.ticker === ticker);
 }
 
 const SYSTEM = `You output a JSON DSL describing a LONG-ONLY strategy. No code.
@@ -73,7 +83,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Invalid DSL from model', raw: chat.choices[0].message.content }, { status: 500 });
     }
 
-    const rows = await loadLocalParquet(ticker.toUpperCase(), startDate, endDate);
+    const rows = await loadLocalParquet(req, ticker.toUpperCase(), startDate, endDate);
     if (rows.length === 0) {
       return NextResponse.json({ ok: true, dsl, result: null, note: 'No data in range' });
     }
