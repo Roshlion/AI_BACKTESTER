@@ -1,0 +1,30 @@
+ 
+# Environment files with API keys
+.env.local
+.env
+
+# Node modules
+node_modules/
+
+# Next.js build files
+.next/
+out/
+
+# Data files (exclude from repo)
+data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp

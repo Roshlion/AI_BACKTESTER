@@ -1,0 +1,13 @@
+﻿{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "POLYGON_API_KEY": "@polygon_api_key",
+    "OPENAI_API_KEY": "@openai_api_key",
+    "AWS_ACCESS_KEY_ID": "@aws_access_key_id",
+    "AWS_SECRET_ACCESS_KEY": "@aws_secret_access_key",
+    "S3_BUCKET_NAME": "@s3_bucket_name"
+  }
+}
