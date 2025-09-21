@@ -1,6 +1,6 @@
 ﻿const fs = require('fs-extra');
 const path = require('path');
-const parquet = require('parquetjs');
+const parquet = require('parquetjs-lite');
 
 const INPUT_DIR = path.join(process.cwd(), 'data', 'parquet');
 const OUTPUT_DIR = path.join(process.cwd(), 'data', 'parquet-final');
@@ -61,6 +61,8 @@ async function convertFile(filePath) {
 
   const writer = await parquet.ParquetWriter.openFile(parquetSchema, outputPath, {
     useDataPageV2: false,
+    useCompression: true,
+    compression: 'GZIP',
   });
 
   try {
