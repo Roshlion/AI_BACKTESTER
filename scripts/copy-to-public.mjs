@@ -40,7 +40,7 @@ Options:
   --input=./path          Input directory with parquet files (default: ./data/parquet-final)
   --output=./path         Output directory (default: ./public/data)
   --manifest=./path       Manifest file to read ticker list from (default: ./public/manifest.json)
-  --clean                 Clean output directory before copying
+  --clean=1               Clean output directory before copying
   --format=json           Convert .json files to .parquet naming (default: preserve)
   --help                  Show this help message
 
@@ -79,13 +79,9 @@ function extractTickerFromFilename(filename) {
 }
 
 function generateOutputFilename(ticker, inputFile, format) {
-  // Always ensure .parquet extension for consistency
-  if (format === 'json' && inputFile.endsWith('.json')) {
-    // For now, keep as .json since we don't have parquet writing capability
-    return `${ticker}.json`;
-  }
-
-  return `${ticker}.parquet`;
+  // Preserve the original file extension
+  const ext = extname(inputFile);
+  return `${ticker}${ext}`;
 }
 
 async function main() {

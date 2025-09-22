@@ -1,14 +1,35 @@
 {
   "version": 1,
   "source": "public",
-  "asOf": "2025-09-21T00:00:00Z",
+  "asOf": "2025-09-22T01:08:10.211Z",
+  "generatedAt": "2025-09-22T01:08:10.212Z",
   "tickers": [
     {
       "ticker": "AAPL",
-      "path": "AAPL.parquet",
-      "firstDate": "2023-01-03",
-      "lastDate": "2024-12-31",
-      "records": 500
+      "url": "/data/AAPL.json",
+      "format": "json",
+      "records": 389,
+      "firstDate": "2024-01-02",
+      "lastDate": "2025-09-19",
+      "sizeBytes": 82440
+    },
+    {
+      "ticker": "GOOGL",
+      "url": "/data/GOOGL.json",
+      "format": "json",
+      "records": 201,
+      "firstDate": "2024-09-24",
+      "lastDate": "2025-09-19",
+      "sizeBytes": 42818
+    },
+    {
+      "ticker": "MSFT",
+      "url": "/data/MSFT.json",
+      "format": "json",
+      "records": 389,
+      "firstDate": "2024-01-02",
+      "lastDate": "2025-09-19",
+      "sizeBytes": 82332
     }
   ]
 }

@@ -1,21 +1,117 @@
-/**
- * Manifest-aware parquet reader for multi-ticker dataset
- * Supports both public static files and Blob storage via manifest
- */
+// lib/safeParquet.ts
+import { Row } from "@/types/row";
 
-export interface Row {
+export type ManifestItem = {
   ticker: string;
-  date: string;          // YYYY-MM-DD
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  vwap?: number;
-  transactions?: number;
+  url: string;
+  format: 'parquet' | 'json';
+  records?: number;
+  firstDate?: string;
+  lastDate?: string;
+  sizeBytes?: number;
+};
+
+export type Manifest = {
+  version: number;
+  source: 'public' | 'blob';
+  asOf: string;
+  tickers: ManifestItem[];
+};
+
+
+export async function loadManifest(req: Request): Promise<Manifest> {
+  const origin = (req as any).nextUrl?.origin ?? new URL(req.url).origin;
+  const src = process.env.PARQUET_URL && /^https?:\/\//i.test(process.env.PARQUET_URL)
+    ? process.env.PARQUET_URL
+    : `${origin}/manifest.json`;
+
+  const res = await fetch(src, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to fetch manifest: ${res.status}`);
+  return await res.json();
 }
 
+function toISODate(input: any): string {
+  if (typeof input === 'string') return input.slice(0, 10);
+  const ts = typeof input === 'bigint' ? Number(input) : Number(input ?? 0);
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+function toNum(x: unknown): number {
+  return typeof x === 'bigint' ? Number(x) : Number(x);
+}
+
+async function fetchBuffer(url: string): Promise<Buffer> {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status} for ${url}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+async function readParquetFromUrl(url: string): Promise<Row[]> {
+  const buf = await fetchBuffer(url);
+  // parquetjs-lite is untyped; rely on ambient types
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  const { ParquetReader } = await import('parquetjs-lite');
+  const reader = await ParquetReader.openBuffer(buf);
+  const cursor = reader.getCursor();
+  const rows: any[] = [];
+  for (let r = await cursor.next(); r; r = await cursor.next()) rows.push(r);
+  await reader.close();
+
+  return rows.map((r: any) => ({
+    ticker: String(r.ticker ?? 'AAPL'),
+    date: toISODate(r.date ?? r.timestamp),
+    timestamp: Number(r.timestamp ?? r.date ?? Date.parse(r.date)),
+    open: toNum(r.open),
+    high: toNum(r.high),
+    low: toNum(r.low),
+    close: toNum(r.close),
+    volume: toNum(r.volume),
+    vwap: r.vwap != null ? Number(r.vwap) : undefined,
+    transactions: r.transactions != null ? Number(r.transactions) : undefined,
+  }));
+}
+
+async function readJsonFromUrl(url: string): Promise<Row[]> {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status} for ${url}`);
+  const arr = await res.json();
+  return (Array.isArray(arr) ? arr : []).map((r: any) => ({
+    ticker: String(r.ticker ?? 'AAPL'),
+    date: toISODate(r.date ?? r.timestamp),
+    timestamp: Number(r.timestamp ?? r.date ?? Date.parse(r.date)),
+    open: toNum(r.open),
+    high: toNum(r.high),
+    low: toNum(r.low),
+    close: toNum(r.close),
+    volume: toNum(r.volume),
+    vwap: r.vwap != null ? Number(r.vwap) : undefined,
+    transactions: r.transactions != null ? Number(r.transactions) : undefined,
+  }));
+}
+
+/** Reads rows for a single ticker using manifest (json or parquet). */
+export async function readTickerRange(
+  req: Request,
+  ticker: string,
+  startDate?: string,
+  endDate?: string
+): Promise<Row[]> {
+  const m = await loadManifest(req);
+  const item = m.tickers.find(t => t.ticker.toUpperCase() === ticker.toUpperCase());
+  if (!item) return [];
+
+  const origin = (req as any).nextUrl?.origin ?? new URL(req.url).origin;
+  const url = item.url.startsWith('http') ? item.url : `${origin}${item.url}`;
+  const rows = item.format === 'json'
+    ? await readJsonFromUrl(url)
+    : await readParquetFromUrl(url);
+
+  if (!startDate && !endDate) return rows;
+  return rows.filter(r => (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate));
+}
+
+// Legacy compatibility exports
 export interface TickerInfo {
   ticker: string;
   path: string;          // relative for public, absolute https URL for Blob
@@ -24,189 +120,6 @@ export interface TickerInfo {
   records: number;
 }
 
-export interface Manifest {
-  version: number;
-  source: 'public' | 'blob';
-  asOf: string;
-  tickers: TickerInfo[];
-}
-
-/**
- * Load manifest from either Blob URL or public/manifest.json
- */
-export async function loadManifest(req: Request): Promise<Manifest> {
-  try {
-    let manifestUrl: string;
-
-    // Check if PARQUET_URL points to a manifest (ends with .json)
-    const parquetUrl = process.env.PARQUET_URL;
-    if (parquetUrl && parquetUrl.endsWith('.json')) {
-      manifestUrl = parquetUrl;
-    } else {
-      // Use public manifest
-      const origin = (req as any).nextUrl?.origin ?? new URL(req.url).origin;
-      manifestUrl = `${origin}/manifest.json`;
-    }
-
-    const response = await fetch(manifestUrl, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch manifest: ${response.status}`);
-    }
-
-    const manifest = await response.json() as Manifest;
-
-    // Validate minimal shape
-    if (!manifest.version || !manifest.source || !Array.isArray(manifest.tickers)) {
-      throw new Error('Invalid manifest structure');
-    }
-
-    return manifest;
-  } catch (error) {
-    console.error('Error loading manifest:', error);
-    return {
-      version: 1,
-      source: 'public',
-      asOf: new Date().toISOString(),
-      tickers: []
-    };
-  }
-}
-
-/**
- * Resolve ticker path to absolute URL
- */
-export function resolveTickerPath(manifest: Manifest, ticker: string, req: Request): string | null {
-  const tickerInfo = manifest.tickers.find(t => t.ticker.toUpperCase() === ticker.toUpperCase());
-
-  if (!tickerInfo) {
-    return null;
-  }
-
-  // If using blob storage, path is already absolute
-  if (manifest.source === 'blob') {
-    return tickerInfo.path;
-  }
-
-  // For public mode, prepend origin if needed
-  if (tickerInfo.path.startsWith('http')) {
-    return tickerInfo.path;
-  }
-
-  const origin = (req as any).nextUrl?.origin ?? new URL(req.url).origin;
-  return `${origin}/${tickerInfo.path}`;
-}
-
-/**
- * Read parquet from URL and normalize to Row[]
- */
-export async function readParquetURL(url: string): Promise<Row[]> {
-  try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch parquet: ${response.status}`);
-    }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const { ParquetReader } = await import("parquetjs-lite");
-    const reader = await ParquetReader.openBuffer(buffer);
-    const cursor = reader.getCursor();
-
-    const rawRows: any[] = [];
-    for (let row = await cursor.next(); row; row = await cursor.next()) {
-      rawRows.push(row);
-    }
-    await reader.close();
-
-    // Normalize rows
-    const rows: Row[] = rawRows.map((raw): Row | null => {
-      // Handle date conversion
-      let date: string;
-      if (typeof raw.date === "string") {
-        date = raw.date.slice(0, 10); // Ensure YYYY-MM-DD format
-      } else {
-        const timestamp = typeof raw.timestamp === "bigint" ? Number(raw.timestamp) : Number(raw.timestamp ?? raw.date ?? 0);
-        date = new Date(timestamp).toISOString().slice(0, 10);
-      }
-
-      // Skip rows without valid date
-      if (!date || date === 'Invalid Date') {
-        return null;
-      }
-
-      // Convert bigint/number values safely
-      const toNum = (v: unknown): number => {
-        if (typeof v === "bigint") return Number(v);
-        const num = Number(v ?? 0);
-        return isNaN(num) ? 0 : num;
-      };
-
-      return {
-        ticker: raw.ticker ? String(raw.ticker) : 'UNKNOWN',
-        date,
-        timestamp: toNum(raw.timestamp ?? raw.date),
-        open: toNum(raw.open),
-        high: toNum(raw.high),
-        low: toNum(raw.low),
-        close: toNum(raw.close),
-        volume: toNum(raw.volume),
-        vwap: raw.vwap != null ? toNum(raw.vwap) : undefined,
-        transactions: raw.transactions != null ? toNum(raw.transactions) : undefined,
-      };
-    }).filter((row): row is Row => row !== null);
-
-    return rows;
-  } catch (error) {
-    console.error(`Error reading parquet from ${url}:`, error);
-    return [];
-  }
-}
-
-/**
- * Read ticker data for date range using manifest
- */
-export async function readTickerRange(
-  req: Request,
-  ticker: string,
-  startDate: string,
-  endDate: string
-): Promise<Row[]> {
-  try {
-    const manifest = await loadManifest(req);
-
-    // Try to get ticker from manifest
-    const tickerPath = resolveTickerPath(manifest, ticker, req);
-
-    let rows: Row[] = [];
-
-    if (tickerPath) {
-      rows = await readParquetURL(tickerPath);
-      // Ensure ticker is set correctly
-      rows = rows.map(row => ({ ...row, ticker: ticker.toUpperCase() }));
-    } else {
-      // Fallback for AAPL using old single-file logic
-      if (ticker.toUpperCase() === 'AAPL') {
-        const origin = (req as any).nextUrl?.origin ?? new URL(req.url).origin;
-        const fallbackUrl = `${origin}/AAPL.parquet`;
-        rows = await readParquetURL(fallbackUrl);
-        rows = rows.map(row => ({ ...row, ticker: 'AAPL' }));
-      }
-    }
-
-    // Filter by date range
-    const filteredRows = rows.filter(row =>
-      row.date >= startDate && row.date <= endDate
-    );
-
-    return filteredRows.sort((a, b) => a.timestamp - b.timestamp);
-  } catch (error) {
-    console.error(`Error reading ticker range for ${ticker}:`, error);
-    return [];
-  }
-}
-
-/**
- * Get source information
- */
 export async function getDataSource(req: Request) {
   try {
     const manifest = await loadManifest(req);
@@ -222,6 +135,30 @@ export async function getDataSource(req: Request) {
       tickerCount: 0
     };
   }
+}
+
+/**
+ * Resolve ticker path to absolute URL (legacy compatibility)
+ */
+export function resolveTickerPath(manifest: Manifest, ticker: string, req: Request): string | null {
+  const tickerInfo = manifest.tickers.find(t => t.ticker.toUpperCase() === ticker.toUpperCase());
+
+  if (!tickerInfo) {
+    return null;
+  }
+
+  // If using blob storage, url is already absolute
+  if (manifest.source === 'blob') {
+    return tickerInfo.url;
+  }
+
+  // For public mode, prepend origin if needed
+  if (tickerInfo.url.startsWith('http')) {
+    return tickerInfo.url;
+  }
+
+  const origin = (req as any).nextUrl?.origin ?? new URL(req.url).origin;
+  return `${origin}${tickerInfo.url}`;
 }
 
 // Legacy compatibility - use readTickerRange instead

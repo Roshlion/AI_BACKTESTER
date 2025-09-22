@@ -8,7 +8,7 @@
  */
 
 import { fileURLToPath } from 'url';
-import { dirname, join, basename } from 'path';
+import { dirname, join, basename, extname } from 'path';
 import fs from 'fs-extra';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,10 +37,11 @@ Usage:
   node scripts/generate-manifest.mjs [options]
 
 Options:
-  --limit=100               Only include first N tickers to keep repo small
+  --limit=50                Only include first N tickers to keep public/ light for Vercel (default: 50)
   --from=./path             Input directory with parquet files (default: ./data/parquet-final)
   --out=./path              Output file path (default: ./public/manifest.json)
-  --source=public           Set source type: 'public' or 'blob' (default: public)
+  --source=public|blob      Set source type: 'public' or 'blob' (default: public)
+  --warn-size-mb=50         Print warning if staged sum exceeds X MB (default: 50)
   --help                    Show this help message
 
 Source Types:
@@ -64,6 +65,10 @@ Examples:
 
 async function analyzeParquetFile(filePath) {
   try {
+    // Get file size
+    const stats = await fs.stat(filePath);
+    const sizeBytes = stats.size;
+
     // For JSON files (our current format), read and analyze
     if (filePath.endsWith('.json')) {
       const data = await fs.readJson(filePath);
@@ -80,6 +85,7 @@ async function analyzeParquetFile(filePath) {
         firstDate: sorted[0].date,
         lastDate: sorted[sorted.length - 1].date,
         ticker: data[0].ticker || 'UNKNOWN',
+        sizeBytes,
         // Additional metadata
         dateRange: sorted[sorted.length - 1].date !== sorted[0].date ?
           `${sorted[0].date} to ${sorted[sorted.length - 1].date}` : sorted[0].date,
@@ -127,6 +133,7 @@ async function analyzeParquetFile(filePath) {
           firstDate,
           lastDate,
           ticker: rows[0].ticker || 'UNKNOWN',
+          sizeBytes,
           dateRange: lastDate !== firstDate ? `${firstDate} to ${lastDate}` : firstDate,
           avgVolume: Math.round(rows.reduce((sum, d) => sum + (d.volume || 0), 0) / rows.length),
           priceRange: {
@@ -147,15 +154,6 @@ async function analyzeParquetFile(filePath) {
   }
 }
 
-function generatePath(ticker, source) {
-  if (source === 'blob') {
-    // Placeholder for blob URLs - will be replaced by blob upload script
-    return `__BLOB_URL__/${ticker}.parquet`;
-  } else {
-    // Public path - relative to site origin
-    return `data/${ticker}.parquet`;
-  }
-}
 
 function validateAnalysis(analysis) {
   if (!analysis) return false;
@@ -180,8 +178,9 @@ async function main() {
   // Parse arguments with defaults
   const inputDir = args.from || './data/parquet-final';
   const outputPath = args.out || './public/manifest.json';
-  const limit = args.limit ? parseInt(args.limit, 10) : 100;
+  const limit = args.limit ? parseInt(args.limit, 10) : 50;
   const source = args.source || 'public';
+  const warnSizeMB = args['warn-size-mb'] ? parseInt(args['warn-size-mb'], 10) : 50;
 
   // Validate source
   if (!['public', 'blob'].includes(source)) {
@@ -228,14 +227,45 @@ Ticker Limit: ${limit === 0 ? 'none' : limit}
   // Sort files for consistent ordering
   dataFiles.sort();
 
-  // Apply limit if specified
-  const filesToProcess = limit > 0 ? dataFiles.slice(0, limit) : dataFiles;
+  // Group files by ticker and prefer parquet over json
+  const tickerFiles = new Map();
 
-  if (filesToProcess.length < dataFiles.length) {
-    console.log(`Processing first ${filesToProcess.length} files (limited by --limit=${limit})`);
+  for (const file of dataFiles) {
+    const nameWithoutExt = basename(file, extname(file));
+    const ticker = nameWithoutExt.toUpperCase();
+    const isParquet = file.endsWith('.parquet');
+
+    if (!tickerFiles.has(ticker)) {
+      tickerFiles.set(ticker, []);
+    }
+    tickerFiles.get(ticker).push({ file, isParquet });
   }
 
-  // Analyze files and build ticker info
+  // Select best file for each ticker (prefer parquet)
+  const selectedFiles = [];
+  for (const [ticker, files] of tickerFiles) {
+    const parquetFile = files.find(f => f.isParquet);
+    const jsonFile = files.find(f => !f.isParquet);
+
+    // Prefer parquet, fallback to json
+    const selected = parquetFile || jsonFile;
+    if (selected) {
+      selectedFiles.push({
+        ticker,
+        file: selected.file,
+        format: selected.isParquet ? 'parquet' : 'json'
+      });
+    }
+  }
+
+  // Apply limit after ticker selection
+  const filesToProcess = limit > 0 ? selectedFiles.slice(0, limit) : selectedFiles;
+
+  if (filesToProcess.length < selectedFiles.length) {
+    console.log(`Processing first ${filesToProcess.length} tickers (limited by --limit=${limit})`);
+  }
+
+  // Analyze selected files and build ticker info
   const tickers = [];
   const analysisResults = [];
   let processed = 0;
@@ -243,7 +273,7 @@ Ticker Limit: ${limit === 0 ? 'none' : limit}
 
   console.log('\nAnalyzing files...');
 
-  for (const file of filesToProcess) {
+  for (const { ticker, file, format } of filesToProcess) {
     const filePath = join(inputDir, file);
     console.log(`Analyzing ${file}...`);
 
@@ -252,20 +282,23 @@ Ticker Limit: ${limit === 0 ? 'none' : limit}
     if (validateAnalysis(analysis)) {
       const tickerInfo = {
         ticker: analysis.ticker,
-        path: generatePath(analysis.ticker, source),
+        url: `/${source === 'public' ? 'data' : 'blob'}/${file}`,
+        format: format,
+        records: analysis.records,
         firstDate: analysis.firstDate,
         lastDate: analysis.lastDate,
-        records: analysis.records
+        sizeBytes: analysis.sizeBytes
       };
 
       tickers.push(tickerInfo);
       analysisResults.push({
         file,
         ticker: analysis.ticker,
+        format,
         ...analysis
       });
 
-      console.log(`  ✓ ${analysis.ticker}: ${analysis.records.toLocaleString()} records (${analysis.dateRange})`);
+      console.log(`  ✓ ${analysis.ticker}: ${analysis.records.toLocaleString()} records (${analysis.dateRange}) [${format.toUpperCase()}]`);
       processed++;
     } else {
       console.log(`  ✗ Skipped ${file}: Could not analyze or invalid data`);
@@ -284,24 +317,20 @@ Ticker Limit: ${limit === 0 ? 'none' : limit}
 
   // Calculate summary statistics
   const totalRecords = tickers.reduce((sum, t) => sum + t.records, 0);
+  const totalSizeBytes = tickers.reduce((sum, t) => sum + t.sizeBytes, 0);
+  const totalSizeMB = totalSizeBytes / (1024 * 1024);
   const dateRange = {
     earliest: tickers.reduce((min, t) => min < t.firstDate ? min : t.firstDate, '9999-12-31'),
     latest: tickers.reduce((max, t) => max > t.lastDate ? max : t.lastDate, '1900-01-01')
   };
 
-  // Generate manifest
+  // Generate manifest in the exact format specified
   const manifest = {
     version: 1,
     source: source,
     asOf: new Date().toISOString(),
-    tickers: tickers,
-    metadata: {
-      generated: new Date().toISOString(),
-      totalTickers: tickers.length,
-      totalRecords,
-      dateRange,
-      generator: 'generate-manifest.mjs v2.0'
-    }
+    generatedAt: new Date().toISOString(),
+    tickers: tickers
   };
 
   // Ensure output directory exists
@@ -333,37 +362,31 @@ Summary:
 --------
 Tickers: ${tickers.length}
 Total Records: ${totalRecords.toLocaleString()}
+Total Size: ${totalSizeMB.toFixed(1)} MB
 Date Range: ${dateRange.earliest} to ${dateRange.latest}
 Source: ${source}
 Processed: ${processed} files
 Skipped: ${skipped} files
 
-Size Estimation:
-----------------`);
+Size Analysis:
+--------------`);
 
-  // Estimate file sizes if public mode
-  if (source === 'public') {
-    let estimatedSizeMB = 0;
-    for (const result of analysisResults) {
-      // Rough estimate: ~100 bytes per record for JSON format
-      const sizeMB = (result.records * 100) / (1024 * 1024);
-      estimatedSizeMB += sizeMB;
+  console.log(`Actual size: ${totalSizeMB.toFixed(1)} MB`);
+
+  // Size warnings
+  if (totalSizeMB > warnSizeMB) {
+    console.log(`
+⚠️  WARNING: Total size (${totalSizeMB.toFixed(1)} MB) exceeds warning threshold (${warnSizeMB} MB)!`);
+
+    if (source === 'public') {
+      console.log(`   This will make your Git repository quite large for Vercel deployment.
+   Consider:
+   - Reducing --limit (currently ${limit === 0 ? 'unlimited' : limit})
+   - Using Blob storage for production (--source=blob)
+   - Recommended: --limit=30-40 for ~${warnSizeMB} MB repo size`);
     }
-
-    console.log(`Estimated public/ size: ${estimatedSizeMB.toFixed(1)} MB`);
-
-    if (estimatedSizeMB > 80) {
-      console.log(`
-⚠️  WARNING: Estimated size (${estimatedSizeMB.toFixed(1)} MB) is quite large for Git repository!
-   Consider reducing --limit or using Blob storage for production.
-   Recommended: --limit=40 for ~40-50 MB repo size.`);
-    } else if (estimatedSizeMB > 50) {
-      console.log(`
-⚠️  Size (${estimatedSizeMB.toFixed(1)} MB) is getting large for Git.
-   Monitor repo size and consider Blob storage for scaling.`);
-    } else {
-      console.log(`Size looks good for Git repository (${estimatedSizeMB.toFixed(1)} MB).`);
-    }
+  } else {
+    console.log(`✓ Size looks good (${totalSizeMB.toFixed(1)} MB, under ${warnSizeMB} MB threshold)`);
   }
 
   console.log(`

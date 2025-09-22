@@ -1,20 +1,23 @@
 #!/usr/bin/env node
 
 /**
- * Enhanced Polygon Data Fetcher with Resume Support
+ * Enhanced Polygon Data Fetcher with Flat Files and REST Support
  *
- * Downloads daily aggregates from Polygon API and saves as per-ticker parquet files.
+ * Downloads daily aggregates from Polygon API using Flat Files first, REST fallback.
  * Supports resume-safe operations, exponential backoff, and various input modes.
  *
  * Usage:
- *   node scripts/fetch-polygon-to-parquet.mjs --tickers=AAPL,MSFT
- *   node scripts/fetch-polygon-to-parquet.mjs --tickers-file=./data/tickers/sp100.txt
- *   node scripts/fetch-polygon-to-parquet.mjs --years=3
+ *   node scripts/fetch-polygon-to-parquet.mjs --tickers=AAPL,MSFT --mode=auto
+ *   node scripts/fetch-polygon-to-parquet.mjs --tickers-file=./data/tickers/sp100.txt --years=3
+ *   node scripts/fetch-polygon-to-parquet.mjs --mode=flat --years=2
  */
 
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs-extra';
+import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
+import zlib from 'zlib';
+import readline from 'node:readline';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -42,15 +45,18 @@ Usage:
   node scripts/fetch-polygon-to-parquet.mjs [options]
 
 Options:
+  --mode=auto|flat|rest       Data source mode (default: auto)
+                              auto: try flat files first, fallback to REST
+                              flat: use Polygon Flat Files (CSV bulk downloads)
+                              rest: use REST API /v2/aggs
   --tickers=AAPL,MSFT,...     Comma-separated list of ticker symbols
   --tickers-file=./path       Path to file with one ticker per line
   --years=3                   Fetch last N years of data (derives start/end)
   --start=YYYY-MM-DD          Start date (required if --years not used)
   --end=YYYY-MM-DD            End date (required if --years not used)
-  --bar=day                   Bar interval (default: day)
   --limit-per-ticker=N        Optional cap on bars per ticker for testing
   --out=./path                Output directory (default: ./data/parquet-final)
-  --concurrency=3             Max concurrent requests (default: 3)
+  --concurrency=2             Max concurrent requests (default: 2)
   --help                      Show this help message
 
 Environment:
@@ -62,30 +68,27 @@ Resume Features:
   - Exponential backoff on rate limits (429) and server errors (5xx)
 
 Examples:
-  # Fetch 3 years of data for all SP100 tickers
-  node scripts/fetch-polygon-to-parquet.mjs --tickers-file=./data/tickers/sp100.txt --years=3
+  # Auto mode: try Flat Files first, fallback to REST
+  node scripts/fetch-polygon-to-parquet.mjs --tickers-file=./data/tickers/sp100.txt --years=3 --mode=auto
 
-  # Fetch specific tickers with date range
-  node scripts/fetch-polygon-to-parquet.mjs --tickers=AAPL,MSFT,GOOGL --start=2022-01-01 --end=2024-12-31
+  # Flat Files only (faster, bulk CSV downloads)
+  node scripts/fetch-polygon-to-parquet.mjs --tickers=AAPL,MSFT,GOOGL --mode=flat --years=2
+
+  # REST API only (more compatible, rate limited)
+  node scripts/fetch-polygon-to-parquet.mjs --tickers=AAPL,MSFT --mode=rest --start=2022-01-01 --end=2024-12-31
 
   # Resume interrupted download
   node scripts/fetch-polygon-to-parquet.mjs --tickers-file=./data/tickers/sp100.txt --years=3
 `);
 }
 
-// Calculate date range based on years
+// Calculate date range based on years (end = today - 2 days to avoid lag)
 function calculateDateRange(years) {
-  const endDate = new Date();
-  const startDate = new Date();
+  const endDate = new Date(Date.now() - 2 * 24 * 3600 * 1000); // today - 2d
+  const startDate = new Date(endDate);
   startDate.setFullYear(endDate.getFullYear() - years);
-
-  // Format as YYYY-MM-DD
-  const formatDate = (date) => date.toISOString().slice(0, 10);
-
-  return {
-    start: formatDate(startDate),
-    end: formatDate(endDate)
-  };
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  return { start: fmt(startDate), end: fmt(endDate) };
 }
 
 // Read tickers from file
@@ -136,6 +139,156 @@ async function checkExistingCoverage(filePath) {
 // Sleep with exponential backoff
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// S3 client factory for Polygon Flat Files
+function getS3Client() {
+  const endpoint = process.env.POLYGON_S3_ENDPOINT || 'https://files.polygon.io';
+  const accessKeyId = process.env.POLYGON_FLATFILES_KEY;
+  const secretAccessKey = process.env.POLYGON_FLATFILES_SECRET;
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('Flat Files credentials missing: set POLYGON_FLATFILES_KEY and POLYGON_FLATFILES_SECRET in .env.local');
+  }
+  return new S3Client({
+    region: 'us-east-1',
+    endpoint,
+    forcePathStyle: true,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+}
+
+function pick(obj, names) {
+  for (const n of names) if (obj[n] != null && obj[n] !== '') return obj[n];
+  return undefined;
+}
+
+// Normalize columns across flat-file variants
+function mapCsvRow(obj) {
+  const ticker = String(pick(obj, ['ticker', 'symbol']) ?? '').toUpperCase();
+
+  // window_start might be epoch-ns; day/date is ISO; normalize to YYYY-MM-DD
+  let iso = '';
+  const ws = pick(obj, ['window_start', 'day', 'date']);
+  if (ws) {
+    if (/^\d{13,}$/.test(String(ws))) {
+      const ms = String(ws).length > 13 ? Number(String(ws).slice(0, 13)) : Number(ws);
+      iso = new Date(ms).toISOString().slice(0, 10);
+    } else {
+      iso = String(ws).slice(0, 10);
+    }
+  }
+  const ts = Date.parse(iso ? `${iso}T16:00:00Z` : (pick(obj, ['timestamp']) ?? 0));
+
+  const open = Number(pick(obj, ['open', 'o']));
+  const high = Number(pick(obj, ['high', 'h']));
+  const low = Number(pick(obj, ['low', 'l']));
+  const close = Number(pick(obj, ['close', 'c']));
+  const volume = Number(pick(obj, ['volume', 'v']));
+  const vwap = pick(obj, ['vwap', 'vw']);
+  const transactions = pick(obj, ['transactions', 'n']);
+
+  return {
+    ticker,
+    date: iso,
+    timestamp: ts,
+    open, high, low, close, volume,
+    vwap: vwap != null ? Number(vwap) : undefined,
+    transactions: transactions != null ? Number(transactions) : undefined,
+  };
+}
+
+async function listDayAggKeys(s3, startDate, endDate) {
+  const bucket = process.env.POLYGON_S3_BUCKET || 'flatfiles';
+  // Data set path: us_stocks_sip/day_aggs_v1/YYYY/MM/2024-01-03.csv.gz
+  const keys = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  const monthCursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (monthCursor <= end) {
+    const y = monthCursor.getFullYear();
+    const m = String(monthCursor.getMonth() + 1).padStart(2, '0');
+    const Prefix = `us_stocks_sip/day_aggs_v1/${y}/${m}/`;
+
+    let ContinuationToken;
+    do {
+      const out = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix, ContinuationToken }));
+      for (const obj of out.Contents ?? []) {
+        const key = obj.Key ?? '';
+        const mDate = key.match(/(\d{4}-\d{2}-\d{2})\.csv\.gz$/);
+        if (!mDate) continue;
+        const date = mDate[1];
+        if (date >= startDate && date <= endDate) keys.push({ key, date });
+      }
+      ContinuationToken = out.IsTruncated ? out.NextContinuationToken : undefined;
+    } while (ContinuationToken);
+
+    monthCursor.setMonth(monthCursor.getMonth() + 1, 1);
+  }
+
+  keys.sort((a, b) => a.date.localeCompare(b.date));
+  return keys;
+}
+
+// True Flat Files fetcher via S3 (day aggregates)
+async function downloadFlatFileData(_apiKey, ticker, startDate, endDate, options = {}) {
+  const { limitPerTicker } = options;
+  const want = new Set([String(ticker).toUpperCase()]);
+  const s3 = getS3Client();
+  const bucket = process.env.POLYGON_S3_BUCKET || 'flatfiles';
+
+  const keys = await listDayAggKeys(s3, startDate, endDate);
+  if (!keys.length) throw new Error('No files in Flat Files for requested range');
+
+  const out = [];
+  for (const { key } of keys) {
+    const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    const gunzip = zlib.createGunzip();
+    const rl = readline.createInterface({ input: obj.Body.pipe(gunzip), crlfDelay: Infinity });
+
+    let header = null;
+    for await (const line of rl) {
+      if (!line) continue;
+      if (!header) { header = line.split(','); continue; }
+      const cols = line.split(',');
+      const rowObj = Object.fromEntries(header.map((h, i) => [h, cols[i]]));
+      const mapped = mapCsvRow(rowObj);
+      if (mapped.ticker && want.has(mapped.ticker) && mapped.date) {
+        out.push(mapped);
+        if (limitPerTicker && out.length >= limitPerTicker) break;
+      }
+    }
+    if (limitPerTicker && out.length >= limitPerTicker) break;
+    await sleep(50); // tiny politeness pause
+  }
+
+  if (!out.length) throw new Error('No data available via Flat Files');
+
+  // Sort + de-dup by timestamp
+  out.sort((a, b) => a.timestamp - b.timestamp);
+  const uniq = Array.from(new Map(out.map(r => [r.timestamp, r])).values())
+                    .sort((a, b) => a.timestamp - b.timestamp);
+
+  console.log(`✓ ${ticker}: Flat Files returned ${uniq.length} bars`);
+  return uniq;
+}
+
+// Generate array of dates between start and end
+function generateDateRange(startDate, endDate) {
+  const dates = [];
+  const current = new Date(startDate);
+  const end = new Date(endDate);
+
+  while (current <= end) {
+    // Skip weekends (Saturday = 6, Sunday = 0)
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      dates.push(current.toISOString().slice(0, 10));
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
 }
 
 // Fetch data from Polygon with retry logic
@@ -224,8 +377,9 @@ async function fetchPolygonBarsWithRetry(apiKey, ticker, startDate, endDate, opt
   }
 }
 
-// Process single ticker with resume support
+// Process single ticker with resume support and mode selection
 async function processTicker(apiKey, ticker, startDate, endDate, outputDir, options = {}) {
+  const { mode = 'auto' } = options;
   const filePath = join(outputDir, `${ticker}.json`); // Using .json for now
 
   // Check existing coverage
@@ -240,7 +394,8 @@ async function processTicker(apiKey, ticker, startDate, endDate, outputDir, opti
         ticker,
         skipped: true,
         existing: existing.records,
-        dateRange: `${existing.firstDate} to ${existing.lastDate}`
+        dateRange: `${existing.firstDate} to ${existing.lastDate}`,
+        method: 'cached'
       };
     }
 
@@ -252,9 +407,26 @@ async function processTicker(apiKey, ticker, startDate, endDate, outputDir, opti
     console.log(`→ ${ticker}: Resuming from ${fetchStartDate} (has data until ${existing.lastDate})`);
   }
 
+  let newBars = [];
+  let method = 'unknown';
+
   try {
-    // Fetch new/missing data
-    const newBars = await fetchPolygonBarsWithRetry(apiKey, ticker, fetchStartDate, endDate, options);
+    // Choose fetching method based on mode
+    if (mode === 'flat') {
+      newBars = await downloadFlatFileData(apiKey, ticker, fetchStartDate, endDate, options);
+      method = 'flat';
+    } else if (mode === 'rest') {
+      newBars = await fetchPolygonBarsWithRetry(apiKey, ticker, fetchStartDate, endDate, options);
+      method = 'rest';
+    } else { // auto
+      try {
+        newBars = await downloadFlatFileData(apiKey, ticker, fetchStartDate, endDate, options);
+        method = 'flat';
+      } catch (e) {
+        newBars = await fetchPolygonBarsWithRetry(apiKey, ticker, fetchStartDate, endDate, options);
+        method = 'rest';
+      }
+    }
 
     let allBars = newBars;
 
@@ -279,7 +451,7 @@ async function processTicker(apiKey, ticker, startDate, endDate, outputDir, opti
       const firstDate = allBars[0].date;
       const lastDate = allBars[allBars.length - 1].date;
 
-      console.log(`✓ ${ticker}: ${allBars.length} total records (${firstDate} to ${lastDate}) ${existing ? '[RESUMED]' : '[NEW]'}`);
+      console.log(`✓ ${ticker}: ${allBars.length} total records (${firstDate} to ${lastDate}) [${method.toUpperCase()}] ${existing ? '[RESUMED]' : '[NEW]'}`);
 
       return {
         ticker,
@@ -287,7 +459,8 @@ async function processTicker(apiKey, ticker, startDate, endDate, outputDir, opti
         records: allBars.length,
         newRecords: newBars.length,
         dateRange: `${firstDate} to ${lastDate}`,
-        resumed: !!existing
+        resumed: !!existing,
+        method
       };
     } else {
       console.log(`- ${ticker}: No data available in range`);
@@ -295,7 +468,8 @@ async function processTicker(apiKey, ticker, startDate, endDate, outputDir, opti
         ticker,
         success: false,
         records: 0,
-        error: 'No data available'
+        error: 'No data available',
+        method
       };
     }
 
@@ -305,7 +479,8 @@ async function processTicker(apiKey, ticker, startDate, endDate, outputDir, opti
       ticker,
       success: false,
       records: 0,
-      error: error.message
+      error: error.message,
+      method
     };
   }
 }
@@ -375,11 +550,26 @@ async function main() {
     process.exit(1);
   }
 
+  // Clamp endDate safely and honor --end even when --years is provided
+  const clampEnd = (inputISO) => {
+    const userEnd = inputISO ? new Date(inputISO + 'T00:00:00Z') : null;
+    const safeMax = new Date(Date.now() - 2 * 24 * 3600 * 1000); // today-2d
+    const chosen = userEnd && userEnd < safeMax ? userEnd : safeMax;
+    return chosen.toISOString().slice(0, 10);
+  };
+  endDate = clampEnd(endDate);
+
   // Parse other options
   const outputDir = args.out || './data/parquet-final';
-  const bar = args.bar || 'day';
+  const mode = args.mode || 'auto';
   const limitPerTicker = args['limit-per-ticker'] ? parseInt(args['limit-per-ticker'], 10) : null;
-  const concurrency = args.concurrency ? parseInt(args.concurrency, 10) : 3;
+  const concurrency = args.concurrency ? parseInt(args.concurrency, 10) : 2;
+
+  // Validate mode
+  if (!['auto', 'flat', 'rest'].includes(mode)) {
+    console.error('Error: --mode must be one of: auto, flat, rest');
+    process.exit(1);
+  }
 
   // Validate date format
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -389,11 +579,11 @@ async function main() {
   }
 
   console.log(`
-Enhanced Polygon Data Fetcher
-=============================
+Enhanced Polygon Data Fetcher with Flat Files Support
+======================================================
+Mode: ${mode} (${mode === 'auto' ? 'Flat Files first, REST fallback' : mode === 'flat' ? 'Flat Files only' : 'REST API only'})
 Tickers: ${tickers.length} symbols
 Date Range: ${startDate} to ${endDate}
-Bar Interval: ${bar}
 Output Directory: ${outputDir}
 Concurrency: ${concurrency}
 Limit per Ticker: ${limitPerTicker || 'unlimited'}
@@ -404,7 +594,7 @@ Starting fetch with resume support...
 
   const startTime = Date.now();
   const results = await processTickersConcurrent(apiKey, tickers, startDate, endDate, outputDir, {
-    bar,
+    mode,
     limitPerTicker,
     concurrency
   });
@@ -418,6 +608,13 @@ Starting fetch with resume support...
   const resumed = results.filter(r => r.resumed);
   const skipped = results.filter(r => r.skipped);
 
+  // Method statistics
+  const methodStats = {
+    flat: results.filter(r => r.method === 'flat').length,
+    rest: results.filter(r => r.method === 'rest').length,
+    cached: results.filter(r => r.method === 'cached').length
+  };
+
   console.log(`
 Summary
 =======
@@ -427,6 +624,11 @@ Failed: ${failed.length} tickers
 Resumed: ${resumed.length} tickers
 Skipped (up to date): ${skipped.length} tickers
 Total Records: ${successful.reduce((sum, r) => sum + (r.records || r.existing || 0), 0).toLocaleString()}
+
+Method Breakdown:
+- Flat Files: ${methodStats.flat} tickers
+- REST API: ${methodStats.rest} tickers
+- Cached: ${methodStats.cached} tickers
 `);
 
   if (successful.length > 0) {
@@ -453,14 +655,15 @@ Total Records: ${successful.reduce((sum, r) => sum + (r.records || r.existing ||
   await fs.writeJson(summaryPath, {
     timestamp: new Date().toISOString(),
     dateRange: { start: startDate, end: endDate },
-    options: { bar, limitPerTicker, concurrency },
+    options: { mode, limitPerTicker, concurrency },
     summary: {
       total: results.length,
       successful: successful.length,
       failed: failed.length,
       resumed: resumed.length,
       skipped: skipped.length,
-      duration
+      duration,
+      methodStats
     },
     results
   }, { spaces: 2 });

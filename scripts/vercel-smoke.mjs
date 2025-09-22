@@ -134,6 +134,29 @@ async function testEndpoint(endpoint) {
         const okColor = parsedResponse.ok ? colors.green : colors.yellow;
         log(`  ${okColor}API Ok: ${parsedResponse.ok}${colors.reset}`);
       }
+
+      // Additional validation for specific endpoints
+      if (endpoint.name === 'Index (Manifest)' && parsedResponse.ok) {
+        const tickerCount = parsedResponse.manifest?.tickers?.length ?? 0;
+        log(`  Ticker Count: ${tickerCount}`);
+
+        // In production, expect at least 50 tickers
+        if (BASE_URL.includes('vercel.app') || BASE_URL.includes('localhost') === false) {
+          if (tickerCount >= 50) {
+            log(`  ${colors.green}✓ Production ticker count OK (≥50)${colors.reset}`);
+          } else {
+            log(`  ${colors.yellow}⚠ Production ticker count low (<50)${colors.reset}`);
+          }
+        }
+      }
+
+      if (endpoint.name === 'Local Batch Data' && parsedResponse.ok) {
+        const batchResultCount = Array.isArray(parsedResponse.data) ? parsedResponse.data.length : 0;
+        log(`  Batch Result Count: ${batchResultCount}`);
+        if (batchResultCount >= 3) {
+          log(`  ${colors.green}✓ Multi-ticker batch working${colors.reset}`);
+        }
+      }
     } catch {
       log(`  Response: ${truncateResponse(responseText)}`);
     }
@@ -172,10 +195,26 @@ async function runSmokeTests() {
   log('');
 
   const results = [];
+  let indexJson = null;
 
   for (const endpoint of ENDPOINTS) {
     const result = await testEndpoint(endpoint);
     results.push(result);
+
+    // Capture index response for later use
+    if (endpoint.name === 'Index (Manifest)' && result.response) {
+      indexJson = result.response;
+    }
+
+    // Additional validation for batch data after we have manifest
+    if (endpoint.name === 'Local Batch Data' && result.response && result.response.ok && indexJson) {
+      const batchResultCount = Array.isArray(result.response.data) ? result.response.data.length : 0;
+      const manifestTickers = Array.isArray(indexJson?.manifest?.tickers) ? indexJson.manifest.tickers : [];
+      if (manifestTickers.length > 1 && batchResultCount < 2) {
+        log(`  ${colors.yellow}⚠ Multi-ticker batch incomplete${colors.reset}`);
+      }
+    }
+
     log(''); // Empty line between tests
   }
 
