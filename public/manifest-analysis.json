@@ -1,0 +1,1510 @@
+{
+  "analysis": [
+    {
+      "file": "AAPL.json",
+      "ticker": "AAPL",
+      "format": "json",
+      "records": 389,
+      "firstDate": "2024-01-02",
+      "lastDate": "2025-09-19",
+      "sizeBytes": 82440,
+      "dateRange": "2024-01-02 to 2025-09-19",
+      "avgVolume": 57630853,
+      "priceRange": {
+        "low": 164.075,
+        "high": 260.1
+      }
+    },
+    {
+      "file": "ABBV.json",
+      "ticker": "ABBV",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13283,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5561929,
+      "priceRange": {
+        "low": 154.7704,
+        "high": 182.89
+      }
+    },
+    {
+      "file": "ABNB.json",
+      "ticker": "ABNB",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13276,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 4921510,
+      "priceRange": {
+        "low": 130.82,
+        "high": 170.1
+      }
+    },
+    {
+      "file": "ADI.json",
+      "ticker": "ADI",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13232,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3376077,
+      "priceRange": {
+        "low": 181.805,
+        "high": 202.44
+      }
+    },
+    {
+      "file": "ADSK.json",
+      "ticker": "ADSK",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13257,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1274052,
+      "priceRange": {
+        "low": 225.45,
+        "high": 279.53
+      }
+    },
+    {
+      "file": "AMAT.json",
+      "ticker": "AMAT",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13320,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 6411187,
+      "priceRange": {
+        "low": 148.05,
+        "high": 214.91
+      }
+    },
+    {
+      "file": "AMD.json",
+      "ticker": "AMD",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13351,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 77792191,
+      "priceRange": {
+        "low": 133.7413,
+        "high": 227.3
+      }
+    },
+    {
+      "file": "AMZN.json",
+      "ticker": "AMZN",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13406,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 43521316,
+      "priceRange": {
+        "low": 144.05,
+        "high": 181.7
+      }
+    },
+    {
+      "file": "AVGO.json",
+      "ticker": "AVGO",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13502,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3035663,
+      "priceRange": {
+        "low": 1041.51,
+        "high": 1438.17
+      }
+    },
+    {
+      "file": "AXP.json",
+      "ticker": "AXP",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13233,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3104518,
+      "priceRange": {
+        "low": 177.81,
+        "high": 231.69
+      }
+    },
+    {
+      "file": "BA.json",
+      "ticker": "BA",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13194,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 10330955,
+      "priceRange": {
+        "low": 177.5194,
+        "high": 258.59
+      }
+    },
+    {
+      "file": "BAC.json",
+      "ticker": "BAC",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13099,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 40446898,
+      "priceRange": {
+        "low": 31.27,
+        "high": 38
+      }
+    },
+    {
+      "file": "BILL.json",
+      "ticker": "BILL",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13044,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 2324145,
+      "priceRange": {
+        "low": 60.61,
+        "high": 80.79
+      }
+    },
+    {
+      "file": "BNTX.json",
+      "ticker": "BNTX",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 12967,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 671223,
+      "priceRange": {
+        "low": 85.2129,
+        "high": 114.695
+      }
+    },
+    {
+      "file": "BRK.B.json",
+      "ticker": "BRK.B",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13334,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3488208,
+      "priceRange": {
+        "low": 355.94,
+        "high": 430
+      }
+    },
+    {
+      "file": "C.json",
+      "ticker": "C",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 12983,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 17090192,
+      "priceRange": {
+        "low": 50.51,
+        "high": 63.365
+      }
+    },
+    {
+      "file": "CAT.json",
+      "ticker": "CAT",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13186,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 2422784,
+      "priceRange": {
+        "low": 276.94,
+        "high": 367.22
+      }
+    },
+    {
+      "file": "CDNS.json",
+      "ticker": "CDNS",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13250,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1511486,
+      "priceRange": {
+        "low": 251.94,
+        "high": 327.355
+      }
+    },
+    {
+      "file": "CI.json",
+      "ticker": "CI",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13146,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1638123,
+      "priceRange": {
+        "low": 291.4401,
+        "high": 365.71
+      }
+    },
+    {
+      "file": "COIN.json",
+      "ticker": "COIN",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13395,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 14996878,
+      "priceRange": {
+        "low": 114.51,
+        "high": 283.48
+      }
+    },
+    {
+      "file": "COST.json",
+      "ticker": "COST",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13277,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 2111396,
+      "priceRange": {
+        "low": 640.5101,
+        "high": 787.08
+      }
+    },
+    {
+      "file": "CRM.json",
+      "ticker": "CRM",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13200,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5678578,
+      "priceRange": {
+        "low": 249.84,
+        "high": 318.715
+      }
+    },
+    {
+      "file": "CRWD.json",
+      "ticker": "CRWD",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13266,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3960068,
+      "priceRange": {
+        "low": 238.6102,
+        "high": 365
+      }
+    },
+    {
+      "file": "CVS.json",
+      "ticker": "CVS",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13021,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 10853441,
+      "priceRange": {
+        "low": 70.191,
+        "high": 83.25
+      }
+    },
+    {
+      "file": "CVX.json",
+      "ticker": "CVX",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13284,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 8655901,
+      "priceRange": {
+        "low": 139.62,
+        "high": 158.19
+      }
+    },
+    {
+      "file": "DASH.json",
+      "ticker": "DASH",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13261,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3794053,
+      "priceRange": {
+        "low": 93.33,
+        "high": 143.34
+      }
+    },
+    {
+      "file": "DDOG.json",
+      "ticker": "DDOG",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13303,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 4288029,
+      "priceRange": {
+        "low": 110.695,
+        "high": 138.61
+      }
+    },
+    {
+      "file": "DE.json",
+      "ticker": "DE",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13150,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1511255,
+      "priceRange": {
+        "low": 353.15,
+        "high": 413.32
+      }
+    },
+    {
+      "file": "DHR.json",
+      "ticker": "DHR",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13190,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 2706943,
+      "priceRange": {
+        "low": 222.53,
+        "high": 259
+      }
+    },
+    {
+      "file": "DOCU.json",
+      "ticker": "DOCU",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13046,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3794059,
+      "priceRange": {
+        "low": 49.12,
+        "high": 64.6999
+      }
+    },
+    {
+      "file": "ELV.json",
+      "ticker": "ELV",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13219,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1009560,
+      "priceRange": {
+        "low": 449.02,
+        "high": 521.18
+      }
+    },
+    {
+      "file": "ESTC.json",
+      "ticker": "ESTC",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13234,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1457659,
+      "priceRange": {
+        "low": 97.9,
+        "high": 136.06
+      }
+    },
+    {
+      "file": "FTNT.json",
+      "ticker": "FTNT",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13051,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 6154382,
+      "priceRange": {
+        "low": 56.94,
+        "high": 73.91
+      }
+    },
+    {
+      "file": "GE.json",
+      "ticker": "GE",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13170,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5976419,
+      "priceRange": {
+        "low": 123.65,
+        "high": 180.36
+      }
+    },
+    {
+      "file": "GOOGL.json",
+      "ticker": "GOOGL",
+      "format": "json",
+      "records": 201,
+      "firstDate": "2024-09-24",
+      "lastDate": "2025-09-19",
+      "sizeBytes": 42818,
+      "dateRange": "2024-09-24 to 2025-09-19",
+      "avgVolume": 34359119,
+      "priceRange": {
+        "low": 143.03,
+        "high": 256
+      }
+    },
+    {
+      "file": "GS.json",
+      "ticker": "GS",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13142,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 2310639,
+      "priceRange": {
+        "low": 372.07,
+        "high": 419.2
+      }
+    },
+    {
+      "file": "HON.json",
+      "ticker": "HON",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13232,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 2992512,
+      "priceRange": {
+        "low": 189.66,
+        "high": 210.605
+      }
+    },
+    {
+      "file": "HUM.json",
+      "ticker": "HUM",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13195,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1991098,
+      "priceRange": {
+        "low": 334.54,
+        "high": 475
+      }
+    },
+    {
+      "file": "IBM.json",
+      "ticker": "IBM",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13221,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5127027,
+      "priceRange": {
+        "low": 157.885,
+        "high": 199.18
+      }
+    },
+    {
+      "file": "IDXX.json",
+      "ticker": "IDXX",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13226,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 422082,
+      "priceRange": {
+        "low": 507.605,
+        "high": 583.39
+      }
+    },
+    {
+      "file": "INTC.json",
+      "ticker": "INTC",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13181,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 44352762,
+      "priceRange": {
+        "low": 40.57,
+        "high": 50.3
+      }
+    },
+    {
+      "file": "INTU.json",
+      "ticker": "INTU",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13241,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1204852,
+      "priceRange": {
+        "low": 585.81,
+        "high": 671.01
+      }
+    },
+    {
+      "file": "ISRG.json",
+      "ticker": "ISRG",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13251,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1646561,
+      "priceRange": {
+        "low": 320.26,
+        "high": 403.759
+      }
+    },
+    {
+      "file": "JNJ.json",
+      "ticker": "JNJ",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13239,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 6916033,
+      "priceRange": {
+        "low": 154.76,
+        "high": 163.58
+      }
+    },
+    {
+      "file": "JPM.json",
+      "ticker": "JPM",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13285,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 8767862,
+      "priceRange": {
+        "low": 164.3,
+        "high": 200.72
+      }
+    },
+    {
+      "file": "KLAC.json",
+      "ticker": "KLAC",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13206,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 975197,
+      "priceRange": {
+        "low": 542.41,
+        "high": 729.15
+      }
+    },
+    {
+      "file": "KO.json",
+      "ticker": "KO",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13035,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 13843290,
+      "priceRange": {
+        "low": 58.66,
+        "high": 61.62
+      }
+    },
+    {
+      "file": "LLY.json",
+      "ticker": "LLY",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13178,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3182837,
+      "priceRange": {
+        "low": 579.05,
+        "high": 800.78
+      }
+    },
+    {
+      "file": "LMT.json",
+      "ticker": "LMT",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13191,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1159266,
+      "priceRange": {
+        "low": 413.92,
+        "high": 466.27
+      }
+    },
+    {
+      "file": "LRCX.json",
+      "ticker": "LRCX",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13228,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1061297,
+      "priceRange": {
+        "low": 723.25,
+        "high": 1007.3899
+      }
+    },
+    {
+      "file": "LYFT.json",
+      "ticker": "LYFT",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13114,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 17933813,
+      "priceRange": {
+        "low": 11.69,
+        "high": 20.82
+      }
+    },
+    {
+      "file": "MA.json",
+      "ticker": "MA",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13135,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 2372885,
+      "priceRange": {
+        "low": 416.53,
+        "high": 490
+      }
+    },
+    {
+      "file": "MCK.json",
+      "ticker": "MCK",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13161,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 726048,
+      "priceRange": {
+        "low": 462.7,
+        "high": 540
+      }
+    },
+    {
+      "file": "MDB.json",
+      "ticker": "MDB",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13176,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1416154,
+      "priceRange": {
+        "low": 340.35,
+        "high": 509.62
+      }
+    },
+    {
+      "file": "META.json",
+      "ticker": "META",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13401,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 17641838,
+      "priceRange": {
+        "low": 340.01,
+        "high": 523.57
+      }
+    },
+    {
+      "file": "MMM.json",
+      "ticker": "MMM",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13064,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5053357,
+      "priceRange": {
+        "low": 90.4765,
+        "high": 110.66
+      }
+    },
+    {
+      "file": "MRK.json",
+      "ticker": "MRK",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13265,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 8600777,
+      "priceRange": {
+        "low": 109.16,
+        "high": 133.1
+      }
+    },
+    {
+      "file": "MRNA.json",
+      "ticker": "MRNA",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13158,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 4353004,
+      "priceRange": {
+        "low": 84.06,
+        "high": 115.97
+      }
+    },
+    {
+      "file": "MRVL.json",
+      "ticker": "MRVL",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13148,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 14576941,
+      "priceRange": {
+        "low": 55.63,
+        "high": 85.7571
+      }
+    },
+    {
+      "file": "MS.json",
+      "ticker": "MS",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 12959,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 8873587,
+      "priceRange": {
+        "low": 83.09,
+        "high": 94.73
+      }
+    },
+    {
+      "file": "MSFT.json",
+      "ticker": "MSFT",
+      "format": "json",
+      "records": 389,
+      "firstDate": "2024-01-02",
+      "lastDate": "2025-09-19",
+      "sizeBytes": 82332,
+      "dateRange": "2024-01-02 to 2025-09-19",
+      "avgVolume": 21300909,
+      "priceRange": {
+        "low": 344.79,
+        "high": 555.45
+      }
+    },
+    {
+      "file": "MU.json",
+      "ticker": "MU",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13083,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 18803110,
+      "priceRange": {
+        "low": 79.15,
+        "high": 122.4599
+      }
+    },
+    {
+      "file": "NET.json",
+      "ticker": "NET",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13006,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 4101785,
+      "priceRange": {
+        "low": 74.37,
+        "high": 116
+      }
+    },
+    {
+      "file": "NFLX.json",
+      "ticker": "NFLX",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13298,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 4512416,
+      "priceRange": {
+        "low": 461.86,
+        "high": 634.3899
+      }
+    },
+    {
+      "file": "NOC.json",
+      "ticker": "NOC",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13132,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 916518,
+      "priceRange": {
+        "low": 426,
+        "high": 483.83
+      }
+    },
+    {
+      "file": "NOW.json",
+      "ticker": "NOW",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13147,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1215054,
+      "priceRange": {
+        "low": 671.22,
+        "high": 815.32
+      }
+    },
+    {
+      "file": "NVDA.json",
+      "ticker": "NVDA",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13361,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 53750625,
+      "priceRange": {
+        "low": 473.2,
+        "high": 974
+      }
+    },
+    {
+      "file": "OKTA.json",
+      "ticker": "OKTA",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13121,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 2181338,
+      "priceRange": {
+        "low": 79.35,
+        "high": 114.5
+      }
+    },
+    {
+      "file": "ON.json",
+      "ticker": "ON",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 12930,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 7475452,
+      "priceRange": {
+        "low": 68.78,
+        "high": 85.16
+      }
+    },
+    {
+      "file": "ORCL.json",
+      "ticker": "ORCL",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13307,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 8973878,
+      "priceRange": {
+        "low": 101.74,
+        "high": 132.7737
+      }
+    },
+    {
+      "file": "PANW.json",
+      "ticker": "PANW",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13297,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5989760,
+      "priceRange": {
+        "low": 260.09,
+        "high": 380.84
+      }
+    },
+    {
+      "file": "PEP.json",
+      "ticker": "PEP",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13228,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5803755,
+      "priceRange": {
+        "low": 161.81,
+        "high": 175.81
+      }
+    },
+    {
+      "file": "PFE.json",
+      "ticker": "PFE",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13125,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 43210742,
+      "priceRange": {
+        "low": 25.61,
+        "high": 30.2788
+      }
+    },
+    {
+      "file": "PG.json",
+      "ticker": "PG",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13171,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 6669805,
+      "priceRange": {
+        "low": 146.28,
+        "high": 163.14
+      }
+    },
+    {
+      "file": "PINS.json",
+      "ticker": "PINS",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13098,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 10252603,
+      "priceRange": {
+        "low": 33.52,
+        "high": 41.6
+      }
+    },
+    {
+      "file": "PLTR.json",
+      "ticker": "PLTR",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13174,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 71655631,
+      "priceRange": {
+        "low": 15.664,
+        "high": 27.5
+      }
+    },
+    {
+      "file": "PTON.json",
+      "ticker": "PTON",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 12857,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 14958562,
+      "priceRange": {
+        "low": 3.96,
+        "high": 7.24
+      }
+    },
+    {
+      "file": "PYPL.json",
+      "ticker": "PYPL",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13169,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 18188189,
+      "priceRange": {
+        "low": 55.77,
+        "high": 68.21
+      }
+    },
+    {
+      "file": "QCOM.json",
+      "ticker": "QCOM",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13324,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 8819314,
+      "priceRange": {
+        "low": 134.9409,
+        "high": 177.59
+      }
+    },
+    {
+      "file": "RBLX.json",
+      "ticker": "RBLX",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13091,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 7886218,
+      "priceRange": {
+        "low": 35.8501,
+        "high": 47.11
+      }
+    },
+    {
+      "file": "ROKU.json",
+      "ticker": "ROKU",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13052,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 6213022,
+      "priceRange": {
+        "low": 61.1,
+        "high": 99.8
+      }
+    },
+    {
+      "file": "RTX.json",
+      "ticker": "RTX",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13025,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 8004849,
+      "priceRange": {
+        "low": 83.96,
+        "high": 98.08
+      }
+    },
+    {
+      "file": "SHOP.json",
+      "ticker": "SHOP",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13064,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 9747148,
+      "priceRange": {
+        "low": 70.615,
+        "high": 91.57
+      }
+    },
+    {
+      "file": "SNAP.json",
+      "ticker": "SNAP",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13121,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 30760130,
+      "priceRange": {
+        "low": 10.49,
+        "high": 17.75
+      }
+    },
+    {
+      "file": "SNOW.json",
+      "ticker": "SNOW",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13264,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 7087737,
+      "priceRange": {
+        "low": 151.49,
+        "high": 237.72
+      }
+    },
+    {
+      "file": "SNPS.json",
+      "ticker": "SNPS",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13205,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1313070,
+      "priceRange": {
+        "low": 477.65,
+        "high": 629.38
+      }
+    },
+    {
+      "file": "SPLK.json",
+      "ticker": "SPLK",
+      "format": "json",
+      "records": 52,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-15",
+      "sizeBytes": 11312,
+      "dateRange": "2024-01-02 to 2024-03-15",
+      "avgVolume": 2045648,
+      "priceRange": {
+        "low": 151.94,
+        "high": 156.97
+      }
+    },
+    {
+      "file": "SPOT.json",
+      "ticker": "SPOT",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13256,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1848010,
+      "priceRange": {
+        "low": 185.37,
+        "high": 278.3
+      }
+    },
+    {
+      "file": "SQ.json",
+      "ticker": "SQ",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 12981,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 10798630,
+      "priceRange": {
+        "low": 61.83,
+        "high": 87.52
+      }
+    },
+    {
+      "file": "TEAM.json",
+      "ticker": "TEAM",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13257,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1739455,
+      "priceRange": {
+        "low": 189.5,
+        "high": 258.69
+      }
+    },
+    {
+      "file": "TER.json",
+      "ticker": "TER",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13190,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1781481,
+      "priceRange": {
+        "low": 92.2901,
+        "high": 113.6
+      }
+    },
+    {
+      "file": "TMO.json",
+      "ticker": "TMO",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13179,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 1595030,
+      "priceRange": {
+        "low": 527.32,
+        "high": 603.82
+      }
+    },
+    {
+      "file": "TSLA.json",
+      "ticker": "TSLA",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13478,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 102470966,
+      "priceRange": {
+        "low": 160.51,
+        "high": 251.25
+      }
+    },
+    {
+      "file": "TWLO.json",
+      "ticker": "TWLO",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13066,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 3530471,
+      "priceRange": {
+        "low": 55.57,
+        "high": 76.03
+      }
+    },
+    {
+      "file": "TXN.json",
+      "ticker": "TXN",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13224,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5601052,
+      "priceRange": {
+        "low": 155.46,
+        "high": 177.75
+      }
+    },
+    {
+      "file": "UBER.json",
+      "ticker": "UBER",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13125,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 20069809,
+      "priceRange": {
+        "low": 57.22,
+        "high": 82.14
+      }
+    },
+    {
+      "file": "UNH.json",
+      "ticker": "UNH",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13180,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 4003170,
+      "priceRange": {
+        "low": 468.19,
+        "high": 549
+      }
+    },
+    {
+      "file": "UPS.json",
+      "ticker": "UPS",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13230,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 4382285,
+      "priceRange": {
+        "low": 138.9,
+        "high": 161.48
+      }
+    },
+    {
+      "file": "V.json",
+      "ticker": "V",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13097,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 5525205,
+      "priceRange": {
+        "low": 256.86,
+        "high": 290.96
+      }
+    },
+    {
+      "file": "VEEV.json",
+      "ticker": "VEEV",
+      "format": "json",
+      "records": 61,
+      "firstDate": "2024-01-02",
+      "lastDate": "2024-03-28",
+      "sizeBytes": 13186,
+      "dateRange": "2024-01-02 to 2024-03-28",
+      "avgVolume": 957532,
+      "priceRange": {
+        "low": 182.77,
+        "high": 236.9
+      }
+    }
+  ],
+  "summary": {
+    "processed": 100,
+    "skipped": 0,
+    "totalFiles": 100,
+    "averageRecordsPerTicker": 69
+  }
+}
