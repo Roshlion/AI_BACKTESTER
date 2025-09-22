@@ -28,3 +28,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+# Windows device name accident
+nul
+
