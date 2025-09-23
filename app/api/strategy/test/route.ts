@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const startDate = '2024-01-01'
     const endDate = '2024-03-31'
 
-    const rows = await readTickerRange(req, ticker, startDate, endDate)
+    const rows = await readTickerRange(ticker, startDate, endDate)
     if (!rows?.length) {
       return NextResponse.json({
         ok: true,

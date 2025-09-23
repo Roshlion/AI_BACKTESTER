@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       }
 
       for (const ticker of tickers) {
-        const rows = await readTickerRange(req, ticker, startDate, endDate);
+        const rows = await readTickerRange(ticker, startDate, endDate);
         if (!rows.length) {
           logs.push(`${ticker}: no data in range`);
           continue;
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     const dsl: StrategyDSL = body.dsl ? normaliseDsl(body.dsl) : DEFAULT_DSL;
 
     for (const ticker of tickers) {
-      const rows = await readTickerRange(req, ticker, startDate, endDate);
+      const rows = await readTickerRange(ticker, startDate, endDate);
       if (!rows.length) {
         logs.push(`${ticker}: no data in range`);
         continue;

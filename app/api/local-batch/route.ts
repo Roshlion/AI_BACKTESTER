@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const data = await Promise.all(
       tickers.map(async (t) => ({
         ticker: t.toUpperCase(),
-        bars: await readTickerRange(req, t, startDate, endDate),
+        bars: await readTickerRange(t, startDate, endDate),
       }))
     );
     return NextResponse.json({ ok: true, source: 'manifest', data });

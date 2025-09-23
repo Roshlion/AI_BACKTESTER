@@ -2,6 +2,9 @@
 # Environment files with API keys
 .env.local
 .env
+.env.*
+!.env.test
+
 
 # Node modules
 node_modules/

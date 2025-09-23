@@ -1,35 +1,35 @@
-"use client";
-import { useEffect, useState } from "react";
+export const dynamic = "force-dynamic";
 
-type Ticker = { ticker: string; records: number; url: string; firstDate: string; lastDate: string; format: string };
-type Manifest = { version: number; source: string; asOf: string; tickers: Ticker[] };
-type IndexResp = { ok: boolean; manifest: Manifest };
+export default async function DashboardPage() {
+  let manifest: { tickers: unknown; asOf: string | null; source: string | null; error?: string | null } = {
+    tickers: [],
+    asOf: null,
+    source: null,
+    error: null,
+  };
 
-export default function DashboardPage() {
-  const [manifest, setManifest] = useState<Manifest | null>(null);
-  const [err, setErr] = useState("");
+  try {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+    const res = await fetch(`${base}/api/index`, { cache: "no-store" });
+    manifest = res.ok ? await res.json() : { tickers: [], error: `HTTP ${res.status}`, asOf: null, source: null };
+  } catch (error) {
+    manifest = { tickers: [], error: String(error), asOf: null, source: null };
+  }
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/index", { cache: "no-store" });
-        const j: IndexResp = await res.json();
-        setManifest(j.manifest);
-      } catch (e: any) {
-        setErr(String(e));
-      }
-    })();
-  }, []);
-
-  const total = manifest?.tickers?.length ?? 0;
+  const tickers = Array.isArray(manifest.tickers) ? manifest.tickers : [];
+  const count = tickers.length;
 
   return (
-    <div className="p-8 text-white">
+    <main className="p-6 text-white">
       <h1 className="text-2xl font-bold">Dashboard</h1>
-      {err && <pre>{err}</pre>}
-      <p className="mt-4">Tickers: {total}</p>
-      <p>Source: {manifest?.source}</p>
-      <p>As of: {manifest?.asOf}</p>
-    </div>
+      {manifest.error ? (
+        <div className="mt-4 rounded bg-red-900/60 p-3 text-sm">
+          Error loading manifest: {manifest.error}
+        </div>
+      ) : null}
+      <p className="mt-4">Tickers: {count}</p>
+      <p>Source: {manifest.source ?? "S3"}</p>
+      <p>As of: {manifest.asOf ?? "unknown"}</p>
+    </main>
   );
 }

@@ -1,8 +1,8 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
 import { readTickerRange, loadManifest } from "@/lib/safeParquet";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
@@ -15,10 +15,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "ticker required" }, { status: 400 });
     }
 
-    const manifest = await loadManifest(req);
-    const entry = manifest.tickers.find((item) => item.ticker.toUpperCase() === ticker);
+    const manifest = await loadManifest();
+    const entry = manifest.tickers.find((item) => item.ticker === ticker);
 
-    const rows = await readTickerRange(req, ticker, startDate, endDate);
+    const rows = await readTickerRange(ticker, startDate, endDate);
     const count = rows.length;
 
     if (!count) {

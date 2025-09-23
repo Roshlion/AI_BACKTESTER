@@ -1,235 +1,86 @@
-import fs from "fs-extra";
-import path from "path";
-import { ParquetSchema, ParquetWriter, ParquetReader } from "parquetjs-lite";
-import { mapSicToCategory } from "./sic-map";
+import type { Row } from "@/types/row";
+import { S3_BASE } from "@/lib/env";
 
-export type DailyBar = {
-  ticker: string;
-  date: string;
-  o: number;
-  h: number;
-  l: number;
-  c: number;
-  v: number;
-  vw?: number;
-};
+export type CsvRow = Row;
 
-export type TickerDetail = {
-  ticker: string;
-  name?: string;
-  sic?: number;
-  sector?: string;
-  industry?: string;
-  marketCap?: number;
-};
-
-export type ManifestEntry = {
-  ticker: string;
-  name?: string;
-  sector?: string;
-  industry?: string;
-  records: number;
-  firstDate?: string;
-  lastDate?: string;
-  marketCap?: number;
-  url: string;
-  source: string;
-};
-
-export interface BuildContext {
-  polygonApiKey?: string;
-  usePolygonForBars: boolean;
-  outputDir: string;
-}
-
-const PARQUET_SCHEMA = new ParquetSchema({
-  ticker: { type: "UTF8" },
-  date: { type: "UTF8" },
-  o: { type: "DOUBLE" },
-  h: { type: "DOUBLE" },
-  l: { type: "DOUBLE" },
-  c: { type: "DOUBLE" },
-  v: { type: "DOUBLE" },
-  vw: { type: "DOUBLE", optional: true },
-});
-
-export function sanitiseTickerForFile(ticker: string): string {
-  return ticker.replace(/[^A-Za-z0-9._-]/g, "_");
-}
-
-export async function readTickerSeed(csvPath: string): Promise<string[]> {
-  const content = await fs.readFile(csvPath, "utf8");
-  const lines: string[] = content
-    .split(/\r?\n/)
-    .map((line: string) => line.trim())
-    .filter(Boolean);
-
+export function parseCsvToRows(csv: string): CsvRow[] {
+  const lines = csv.trim().split(/\r?\n/);
   if (!lines.length) return [];
 
-  const [header, ...rows] = lines;
-  const headerLower = header.toLowerCase();
-  if (headerLower.includes(",")) {
-    const tickerColIndex = 0;
-    return rows
-      .map((row: string) => row.split(",")[tickerColIndex]?.trim())
-      .filter((value): value is string => !!value);
-  }
+  const header = lines.shift() ?? "";
+  const columns = header.split(",").map((value) => value.trim().toLowerCase());
 
-  if (headerLower === "ticker") {
-    return rows;
-  }
+  const dateIndex = columns.indexOf("date");
+  const openIndex = columns.indexOf("open");
+  const highIndex = columns.indexOf("high");
+  const lowIndex = columns.indexOf("low");
+  const closeIndex = columns.indexOf("close");
+  const volumeIndex = columns.indexOf("volume");
+  const tickerIndex = columns.indexOf("ticker");
 
-  return lines;
+  return lines
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split(","))
+    .map((parts) => {
+      const tickerValue = tickerIndex >= 0 ? parts[tickerIndex] ?? "" : "";
+      const dateValue = dateIndex >= 0 ? parts[dateIndex] ?? "" : "";
+      const openValue = openIndex >= 0 ? parts[openIndex] ?? "" : "";
+      const highValue = highIndex >= 0 ? parts[highIndex] ?? "" : "";
+      const lowValue = lowIndex >= 0 ? parts[lowIndex] ?? "" : "";
+      const closeValue = closeIndex >= 0 ? parts[closeIndex] ?? "" : "";
+      const volumeValue = volumeIndex >= 0 ? parts[volumeIndex] ?? "" : "";
+
+      return {
+        ticker: tickerValue.toUpperCase(),
+        date: dateValue,
+        timestamp: Date.parse(dateValue),
+        open: Number(openValue || 0),
+        high: Number(highValue || 0),
+        low: Number(lowValue || 0),
+        close: Number(closeValue || 0),
+        volume: Number(volumeValue || 0),
+      };
+    });
 }
 
-async function fetchJson(url: string, apiKey?: string) {
-  const requestUrl = apiKey ? (url.includes("?") ? `${url}&apiKey=${apiKey}` : `${url}?apiKey=${apiKey}`) : url;
-  const response = await fetch(requestUrl, { headers: { "content-type": "application/json" } });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Request failed (${response.status}) ${response.statusText}: ${body}`);
+export async function loadCsv(symbol: string): Promise<CsvRow[]> {
+  const url = `${S3_BASE}/datasets/${symbol.toUpperCase()}.csv`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`CSV fetch failed ${res.status} for ${symbol}`);
   }
-  return response.json();
+  const text = await res.text();
+  return parseCsvToRows(text);
 }
 
-export async function fetchDailyBarsFromPolygon(
-  ticker: string,
-  apiKey: string,
-  start = "2000-01-01",
-  end?: string,
-): Promise<DailyBar[]> {
-  const results: DailyBar[] = [];
-  let url = `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/1/day/${start}/${
-    end ?? new Date().toISOString().slice(0, 10)
-  }?adjusted=true&limit=50000&sort=asc`;
-
-  while (url) {
-    const payload: any = await fetchJson(url, apiKey);
-    const bars: any[] = payload.results ?? [];
-    for (const bar of bars) {
-      const date = new Date(bar.t ?? 0).toISOString().slice(0, 10);
-      results.push({
-        ticker,
-        date,
-        o: Number(bar.o ?? 0),
-        h: Number(bar.h ?? 0),
-        l: Number(bar.l ?? 0),
-        c: Number(bar.c ?? 0),
-        v: Number(bar.v ?? 0),
-        vw: bar.vw != null ? Number(bar.vw) : undefined,
-      });
-    }
-    url = payload.next_url ?? "";
+export async function loadParquet(symbol: string): Promise<Row[]> {
+  const url = `${S3_BASE}/${symbol.toUpperCase()}.parquet`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Parquet fetch failed ${res.status} for ${symbol}`);
   }
-
-  return results;
-}
-
-export async function writeBarsToParquet(filePath: string, bars: DailyBar[]): Promise<void> {
-  if (!bars.length) {
-    throw new Error("Cannot write empty dataset to parquet");
-  }
-
-  await fs.ensureDir(path.dirname(filePath));
-  const writer = await ParquetWriter.openFile(PARQUET_SCHEMA, filePath);
-
-  for (const row of bars) {
-    await writer.appendRow(row);
-  }
-
-  await writer.close();
-}
-
-export async function readParquetSummary(
-  filePath: string,
-): Promise<{ records: number; firstDate?: string; lastDate?: string }> {
-  const reader = await ParquetReader.openFile(filePath);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const { ParquetReader } = await import("parquetjs-lite");
+  const reader = await ParquetReader.openBuffer(buffer);
   const cursor = reader.getCursor();
-  let recordCount = 0;
-  let firstDate: string | undefined;
-  let lastDate: string | undefined;
+  const rows: Row[] = [];
 
-  for (let row = await cursor.next(); row; row = await cursor.next()) {
-    recordCount += 1;
-    const date = typeof row.date === "string" ? row.date : new Date(Number(row.date ?? 0)).toISOString().slice(0, 10);
-    if (!firstDate || date < firstDate) firstDate = date;
-    if (!lastDate || date > lastDate) lastDate = date;
+  for (let record = await cursor.next(); record; record = await cursor.next()) {
+    rows.push({
+      ticker: String(record.ticker ?? symbol).toUpperCase(),
+      date: typeof record.date === "string" ? record.date.slice(0, 10) : new Date(Number(record.date ?? record.timestamp ?? 0)).toISOString().slice(0, 10),
+      timestamp: Number(record.timestamp ?? Date.parse(record.date)),
+      open: Number(record.open ?? 0),
+      high: Number(record.high ?? 0),
+      low: Number(record.low ?? 0),
+      close: Number(record.close ?? 0),
+      volume: Number(record.volume ?? 0),
+      vwap: record.vwap != null ? Number(record.vwap) : undefined,
+      transactions: record.transactions != null ? Number(record.transactions) : undefined,
+    });
   }
 
   await reader.close();
-  return { records: recordCount, firstDate, lastDate };
+  return rows;
 }
-
-export async function fetchTickerMetadata(ticker: string, apiKey?: string): Promise<TickerDetail> {
-  if (!apiKey) {
-    return { ticker };
-  }
-
-  try {
-    const data: any = await fetchJson(
-      `https://api.polygon.io/v3/reference/tickers/${encodeURIComponent(ticker)}`,
-      apiKey,
-    );
-    const result = data.results ?? {};
-    const sic = result.sic_code ? Number(result.sic_code) : undefined;
-    const category = mapSicToCategory(sic);
-    return {
-      ticker,
-      name: result.name ?? result.description ?? undefined,
-      sic,
-      sector: result.sector ?? category.sector,
-      industry: result.industry ?? category.industry,
-      marketCap: result.market_cap ?? undefined,
-    };
-  } catch (error) {
-    return { ticker };
-  }
-}
-
-export async function ensureTickerDataset(
-  ticker: string,
-  context: BuildContext,
-): Promise<{ parquetPath: string; summary: ManifestEntry | null }> {
-  const sanitisedTicker = sanitiseTickerForFile(ticker.toUpperCase());
-  const parquetPath = path.join(context.outputDir, `${sanitisedTicker}.parquet`);
-  const exists = await fs.pathExists(parquetPath);
-
-  if (!exists && context.usePolygonForBars) {
-    if (!context.polygonApiKey) {
-      throw new Error("POLYGON_API_KEY is required when USE_POLYGON_FOR_BARS=true");
-    }
-    const bars = await fetchDailyBarsFromPolygon(ticker, context.polygonApiKey);
-    if (bars.length) {
-      await writeBarsToParquet(parquetPath, bars);
-    }
-  }
-
-  if (!(await fs.pathExists(parquetPath))) {
-    return { parquetPath, summary: null };
-  }
-
-  const summary = await readParquetSummary(parquetPath);
-  const metadata = await fetchTickerMetadata(ticker, context.polygonApiKey);
-
-  return {
-    parquetPath,
-    summary: {
-      ticker: ticker.toUpperCase(),
-      name: metadata.name,
-      sector: metadata.sector,
-      industry: metadata.industry,
-      marketCap: metadata.marketCap,
-      records: summary.records,
-      firstDate: summary.firstDate,
-      lastDate: summary.lastDate,
-      url: `/${sanitisedTicker}.parquet`,
-      source: "local",
-    },
-  };
-}
-
-
-
-
-
-
