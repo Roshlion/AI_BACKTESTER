@@ -33,19 +33,65 @@ export default function DataExplorerPage() {
   const [sortBy, setSortBy] = useState<"ticker" | "records" | "lastDate">("ticker");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
+  // Normalizes mixed schemas to our expected shape
+  function normalizeTicker(t: any) {
+    const ticker = String(t?.ticker ?? t?.symbol ?? "").toUpperCase();
+    return {
+      ticker,
+      url: t?.url,
+      // use ?? so 0 is kept
+      records: t?.records ?? t?.recordCount ?? t?.rows ?? undefined,
+      firstDate: t?.firstDate ?? t?.first_date ?? t?.start ?? undefined,
+      lastDate: t?.lastDate ?? t?.last_date ?? t?.end ?? undefined,
+      format: (t?.format ?? t?.file_format ?? "").toUpperCase() || undefined,
+      sector: t?.sector ?? t?.Sector ?? undefined,
+      industry: t?.industry ?? t?.Industry ?? undefined,
+    } as TickerInfo;
+  }
+
   useEffect(() => {
     async function loadData() {
       try {
         const response = await fetch("/api/index", { cache: "no-store" });
         const result = await response.json();
 
-        if (result.tickers) {
+        let tickers: any[] = Array.isArray(result.tickers)
+          ? result.tickers.map((t: any) => (typeof t === "string" ? { ticker: t } : t))
+          : [];
+
+        let normalized = tickers.map(normalizeTicker);
+
+        // If everything lacks metadata, fall back to public/manifest.json and merge
+        const needsEnrichment = normalized.every(
+          (t) => t.records == null && t.firstDate == null && t.lastDate == null
+        );
+
+        if (needsEnrichment) {
+          try {
+            const pubRes = await fetch("/manifest.json", { cache: "no-store" });
+            if (pubRes.ok) {
+              const pub = await pubRes.json();
+              const map = new Map(
+                (Array.isArray(pub?.tickers) ? pub.tickers : []).map((x: any) => [
+                  String(x?.ticker ?? "").toUpperCase(),
+                  normalizeTicker(x),
+                ])
+              );
+              normalized = normalized.map((t) => {
+                const e = map.get(t.ticker);
+                return e ? { ...t, ...e, ticker: t.ticker } : t;
+              });
+            }
+          } catch {
+            // no-op; keep normalized as-is
+          }
+        }
+
+        if (normalized.length > 0) {
           setData({
-            tickers: Array.isArray(result.tickers)
-              ? result.tickers.map((t: any) => typeof t === "string" ? { ticker: t } : t)
-              : [],
-            asOf: result.asOf,
-            source: result.source,
+            tickers: normalized,
+            asOf: result.asOf ?? null,
+            source: result.source ?? "api/index",
           });
         } else {
           setError("No ticker data found");
@@ -96,12 +142,12 @@ export default function DataExplorerPage() {
 
       switch (sortBy) {
         case "records":
-          aVal = a.records || 0;
-          bVal = b.records || 0;
+          aVal = a.records ?? 0;
+          bVal = b.records ?? 0;
           break;
         case "lastDate":
-          aVal = a.lastDate || "";
-          bVal = b.lastDate || "";
+          aVal = a.lastDate ?? "";
+          bVal = b.lastDate ?? "";
           break;
         default:
           aVal = a.ticker;
@@ -120,8 +166,8 @@ export default function DataExplorerPage() {
     });
 
     // Calculate stats
-    const withData = data.tickers.filter(t => t.records && t.records > 0);
-    const totalRecords = withData.reduce((sum, t) => sum + (t.records || 0), 0);
+    const withData = data.tickers.filter(t => (t.records ?? 0) > 0);
+    const totalRecords = withData.reduce((sum, t) => sum + (t.records ?? 0), 0);
 
     return {
       filteredTickers: filtered,
@@ -372,10 +418,10 @@ export default function DataExplorerPage() {
                       )}
                     </td>
                     <td className="p-4 text-right text-gray-300">
-                      {ticker.records?.toLocaleString() || "-"}
+                      {ticker.records != null ? ticker.records.toLocaleString() : "-"}
                     </td>
-                    <td className="p-4 text-gray-300">{ticker.firstDate || "-"}</td>
-                    <td className="p-4 text-gray-300">{ticker.lastDate || "-"}</td>
+                    <td className="p-4 text-gray-300">{ticker.firstDate ?? "-"}</td>
+                    <td className="p-4 text-gray-300">{ticker.lastDate ?? "-"}</td>
                     <td className="p-4">
                       {ticker.format && (
                         <span className="inline-block px-2 py-1 bg-green-600/20 text-green-300 text-xs rounded uppercase">
