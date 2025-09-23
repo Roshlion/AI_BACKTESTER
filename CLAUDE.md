@@ -37,221 +37,251 @@ AI Backtester - A trading strategy backtesting application built with Next.js
 - Ensure all type checks pass
 
 ## Additional Information
-CLAUDE.md — Implementation plan for AI_BACKTESTER
+Claude/Codex prompt (copy-paste)
 
-Goal: Fix “Flat Files” mode so it actually pulls Polygon’s S3 CSV.gz day aggregates, parses them, and feeds our JSON. Keep current REST mode as-is. Ensure smoke passes with 2+ tickers. Leave secrets only in .env.local (do not commit).
+You are modifying a Next.js 14 (TS, App Router, RSC) app named AI_BACKTESTER.
+Objective: make both local & prod read datasets from S3; fix dashboard “Tickers: 0” by creating and serving prod/index.json; remove any fs reads from API routes; ensure Node runtime where needed.
 
-🔐 The user will place credentials in .env.local. Do not hardcode or commit secrets.
-✅ Invariants: Next API routes export runtime="nodejs", dynamic="force-dynamic", and never use fs (only fetch/safe loader). Manifest contract unchanged.
+Known config
 
-0) Dependencies
+S3 bucket: ai-backtester-data-rosh (region: us-east-1)
 
-Edit package.json
+Prefix: prod
 
-  "dependencies": {
-+   "@aws-sdk/client-s3": "^3.616.0",
-    "fs-extra": "^11.2.0",
-    ...
-  }
+Public GET works for objects like prod/AMD.parquet (200).
 
+prod/index.json does not exist → must be generated.
 
-Run (handled by the user later):
+1) Env layer
 
-npm i @aws-sdk/client-s3
+Create lib/env.ts:
 
-1) Env vars (do not commit secrets)
-
-Create/append .env.local (local only; do not commit):
-
-# REST (already used elsewhere)
-POLYGON_API_KEY=REPLACE_WITH_YOUR_REST_API_KEY
-
-# Flat Files S3 credentials from Polygon dashboard
-POLYGON_FLATFILES_KEY=REPLACE_WITH_YOUR_S3_ACCESS_KEY_ID
-POLYGON_FLATFILES_SECRET=REPLACE_WITH_YOUR_S3_SECRET
-POLYGON_S3_ENDPOINT=https://files.polygon.io
-POLYGON_S3_BUCKET=flatfiles
-
-
-The user has provided:
-
-Access Key ID: 1a55676b-ddac-4137-a70f-aa2780ea5b41
-
-Secret Access Key: u0Y1BDQsFRJnZGPp8TlsH4LT7nBF8o8t
-
-Endpoint: https://files.polygon.io
-
-Bucket: flatfiles
-The REST API key is the same string the user uses elsewhere. Do not hardcode; read from .env.local.
-Also: advise the user to rotate keys after setup since they were shared in chat.
-
-2) Implement true S3 Flat Files in the fetcher
-
-File: scripts/fetch-polygon-to-parquet.mjs
-What to change: Replace the current “Flat Files” branch (which hits /v1/open-close) with S3 CSV.gz reading for dataset us_stocks_sip/day_aggs_v1/YYYY/MM/YYYY-MM-DD.csv.gz. Filter rows by ticker in CSV.
-
-a) Add imports at the top
- import { fileURLToPath } from 'url';
- import { dirname, join } from 'path';
- import fs from 'fs-extra';
-+import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
-+import zlib from 'zlib';
-+import readline from 'node:readline';
-
-b) Add S3 client factory & helpers (place near existing helpers)
-function getS3Client() {
-  const endpoint = process.env.POLYGON_S3_ENDPOINT || 'https://files.polygon.io';
-  const accessKeyId = process.env.POLYGON_FLATFILES_KEY;
-  const secretAccessKey = process.env.POLYGON_FLATFILES_SECRET;
-  if (!accessKeyId || !secretAccessKey) {
-    throw new Error('Flat Files credentials missing: set POLYGON_FLATFILES_KEY and POLYGON_FLATFILES_SECRET in .env.local');
-  }
-  return new S3Client({
-    region: 'us-east-1',
-    endpoint,
-    forcePathStyle: true,
-    credentials: { accessKeyId, secretAccessKey },
-  });
+// lib/env.ts
+function req(name: string) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env ${name}`);
+  return v;
 }
 
-function pick(obj, names) {
-  for (const n of names) if (obj[n] != null && obj[n] !== '') return obj[n];
-  return undefined;
-}
+export const AWS_BUCKET = req("AWS_BUCKET");             // ai-backtester-data-rosh
+export const AWS_REGION = process.env.AWS_REGION || "us-east-1";
+export const AWS_PREFIX = process.env.AWS_PREFIX || "prod";
 
-// Normalize columns across flat-file variants
-function mapCsvRow(obj) {
-  const ticker = String(pick(obj, ['ticker', 'symbol']) ?? '').toUpperCase();
+// Global endpoint is fine for this bucket:
+export const S3_BASE = process.env.S3_BASE
+  || `https://${AWS_BUCKET}.s3.amazonaws.com/${AWS_PREFIX}`;
 
-  // window_start might be epoch-ns; day/date is ISO; normalize to YYYY-MM-DD
-  let iso = '';
-  const ws = pick(obj, ['window_start', 'day', 'date']);
-  if (ws) {
-    if (/^\d{13,}$/.test(String(ws))) {
-      const ms = String(ws).length > 13 ? Number(String(ws).slice(0, 13)) : Number(ws);
-      iso = new Date(ms).toISOString().slice(0, 10);
-    } else {
-      iso = String(ws).slice(0, 10);
+
+README: document required envs:
+
+AWS_BUCKET=ai-backtester-data-rosh
+AWS_REGION=us-east-1
+AWS_PREFIX=prod
+S3_BASE=https://ai-backtester-data-rosh.s3.amazonaws.com/prod
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+POLYGON_API_KEY=<if used by server code>
+
+2) Manifest API (Node runtime)
+
+Replace app/api/index/route.ts:
+
+import { NextResponse } from "next/server";
+import { S3_BASE } from "@/lib/env";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  try {
+    const url = `${S3_BASE}/index.json`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: `manifest fetch failed: ${res.status}`, tickers: [], source: url, asOf: null },
+        { status: 502 }
+      );
     }
+    const j = await res.json();
+    const tickers = Array.isArray(j?.tickers) ? j.tickers : [];
+    return NextResponse.json({
+      tickers,
+      asOf: j?.asOf ?? null,
+      source: j?.source ?? url
+    });
+  } catch (e:any) {
+    return NextResponse.json({ error: String(e), tickers: [] }, { status: 500 });
   }
-  const ts = Date.parse(iso ? `${iso}T16:00:00Z` : (pick(obj, ['timestamp']) ?? 0));
+}
 
-  const open = Number(pick(obj, ['open', 'o']));
-  const high = Number(pick(obj, ['high', 'h']));
-  const low = Number(pick(obj, ['low', 'l']));
-  const close = Number(pick(obj, ['close', 'c']));
-  const volume = Number(pick(obj, ['volume', 'v']));
-  const vwap = pick(obj, ['vwap', 'vw']);
-  const transactions = pick(obj, ['transactions', 'n']);
+3) Dashboard no-cache
 
-  return {
-    ticker,
-    date: iso,
-    timestamp: ts,
-    open, high, low, close, volume,
-    vwap: vwap != null ? Number(vwap) : undefined,
-    transactions: transactions != null ? Number(transactions) : undefined,
+Edit app/dashboard/page.tsx to fetch /api/index with no-store and show counts safely:
+
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  let manifest: any = { tickers: [], asOf: null, source: null, error: null };
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/index`, { cache: "no-store" });
+    manifest = res.ok ? await res.json() : { tickers: [], error: `HTTP ${res.status}` };
+  } catch (e:any) {
+    manifest = { tickers: [], error: String(e) };
+  }
+
+  const count = Array.isArray(manifest.tickers) ? manifest.tickers.length : 0;
+
+  return (
+    <main className="p-6">
+      <h1>Dashboard</h1>
+      <p>Tickers: {count}</p>
+      <p>Source: {manifest.source ?? "S3"}</p>
+      <p>As of: {manifest.asOf ?? "unknown"}</p>
+      {manifest.error ? <p style={{color:"crimson"}}>Error: {manifest.error}</p> : null}
+    </main>
+  );
+}
+
+4) S3-fetch loaders (no fs in API routes)
+
+Update any ingestion that reads local files to use HTTP fetch from S3:
+
+In lib/ingest-bars.ts (CSV) add:
+
+import { S3_BASE } from "@/lib/env";
+
+export async function loadCsv(symbol: string) {
+  const url = `${S3_BASE}/datasets/${symbol}.csv`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`CSV fetch failed ${res.status} for ${symbol}`);
+  const text = await res.text();
+  // parse to timeseries...
+  return parseCsvToBars(text);
+}
+
+
+For Parquet in any server code or API route, ensure Node runtime and:
+
+import { S3_BASE } from "@/lib/env";
+// import a parquet reader that accepts Buffer/Uint8Array (e.g., parquet-wasm/parquets)
+export async function loadParquet(symbol: string) {
+  const url = `${S3_BASE}/${symbol}.parquet`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Parquet fetch failed ${res.status} for ${symbol}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  // decode parquet to rows
+  const rows = await parseParquet(buf);
+  return normalizeRows(rows);
+}
+
+
+In all affected API routes (e.g., app/api/strategy/run/route.ts) add:
+
+export const runtime = "nodejs";
+
+5) Manifest builder script (local, then upload to S3)
+
+Add scripts/build-manifest.ts:
+
+/**
+ * Build a manifest by listing S3 objects under PREFIX,
+ * extract ticker symbols from keys like "prod/AMD.parquet",
+ * and upload prod/index.json (public-read).
+ *
+ * Run locally:  npx tsx scripts/build-manifest.ts
+ * Requires AWS CLI creds OR AWS SDK credentials in env.
+ */
+
+import { S3Client, ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
+
+const AWS_BUCKET = process.env.AWS_BUCKET!;
+const AWS_REGION = process.env.AWS_REGION || "us-east-1";
+const AWS_PREFIX = process.env.AWS_PREFIX || "prod";
+
+async function main() {
+  if (!AWS_BUCKET) throw new Error("AWS_BUCKET env required");
+
+  const s3 = new S3Client({ region: AWS_REGION });
+
+  const tickers = new Set<string>();
+  let ContinuationToken: string | undefined = undefined;
+
+  do {
+    const out = await s3.send(new ListObjectsV2Command({
+      Bucket: AWS_BUCKET,
+      Prefix: AWS_PREFIX + "/",
+      ContinuationToken,
+      MaxKeys: 1000,
+    }));
+    (out.Contents || []).forEach(obj => {
+      const k = obj.Key || "";
+      // accept .parquet or .csv
+      const m = k.match(/\/([A-Z0-9\.\-_]+)\.(parquet|csv)$/i);
+      if (m) tickers.add(m[1]);
+    });
+    ContinuationToken = out.NextContinuationToken;
+  } while (ContinuationToken);
+
+  const manifest = {
+    asOf: new Date().toISOString(),
+    source: `s3://${AWS_BUCKET}/${AWS_PREFIX}/`,
+    tickers: Array.from(tickers).sort(),
   };
+
+  const body = Buffer.from(JSON.stringify(manifest, null, 2));
+  await s3.send(new PutObjectCommand({
+    Bucket: AWS_BUCKET,
+    Key: `${AWS_PREFIX}/index.json`,
+    Body: body,
+    ContentType: "application/json",
+    ACL: "public-read", // bucket policy already allows GetObject, but this is safe
+  }));
+
+  console.log(`Wrote s3://${AWS_BUCKET}/${AWS_PREFIX}/index.json with ${manifest.tickers.length} tickers`);
 }
 
-async function listDayAggKeys(s3, startDate, endDate) {
-  const bucket = process.env.POLYGON_S3_BUCKET || 'flatfiles';
-  // Data set path: us_stocks_sip/day_aggs_v1/YYYY/MM/2024-01-03.csv.gz
-  const keys = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});
 
-  const monthCursor = new Date(start.getFullYear(), start.getMonth(), 1);
-  while (monthCursor <= end) {
-    const y = monthCursor.getFullYear();
-    const m = String(monthCursor.getMonth() + 1).padStart(2, '0');
-    const Prefix = `us_stocks_sip/day_aggs_v1/${y}/${m}/`;
 
-    let ContinuationToken;
-    do {
-      const out = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix, ContinuationToken }));
-      for (const obj of out.Contents ?? []) {
-        const key = obj.Key ?? '';
-        const mDate = key.match(/(\d{4}-\d{2}-\d{2})\.csv\.gz$/);
-        if (!mDate) continue;
-        const date = mDate[1];
-        if (date >= startDate && date <= endDate) keys.push({ key, date });
-      }
-      ContinuationToken = out.IsTruncated ? out.NextContinuationToken : undefined;
-    } while (ContinuationToken);
+Add dev deps if needed in package.json:
 
-    monthCursor.setMonth(monthCursor.getMonth() + 1, 1);
+{
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "@aws-sdk/client-s3": "^3.616.0"
+  },
+  "scripts": {
+    "build:manifest": "tsx scripts/build-manifest.ts"
   }
-
-  keys.sort((a, b) => a.date.localeCompare(b.date));
-  return keys;
 }
 
-c) Replace the current downloadFlatFileData(...) with S3 CSV.gz parsing
-// True Flat Files fetcher via S3 (day aggregates)
-async function downloadFlatFileData(_apiKey, ticker, startDate, endDate, options = {}) {
-  const { limitPerTicker } = options;
-  const want = new Set([String(ticker).toUpperCase()]);
-  const s3 = getS3Client();
-  const bucket = process.env.POLYGON_S3_BUCKET || 'flatfiles';
+6) Health route (optional quick ping)
 
-  const keys = await listDayAggKeys(s3, startDate, endDate);
-  if (!keys.length) throw new Error('No files in Flat Files for requested range');
+Add app/api/health/route.ts:
 
-  const out = [];
-  for (const { key } of keys) {
-    const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-    const gunzip = zlib.createGunzip();
-    const rl = readline.createInterface({ input: obj.Body.pipe(gunzip), crlfDelay: Infinity });
-
-    let header = null;
-    for await (const line of rl) {
-      if (!line) continue;
-      if (!header) { header = line.split(','); continue; }
-      const cols = line.split(',');
-      const rowObj = Object.fromEntries(header.map((h, i) => [h, cols[i]]));
-      const mapped = mapCsvRow(rowObj);
-      if (mapped.ticker && want.has(mapped.ticker) && mapped.date) {
-        out.push(mapped);
-        if (limitPerTicker && out.length >= limitPerTicker) break;
-      }
-    }
-    if (limitPerTicker && out.length >= limitPerTicker) break;
-    await sleep(50); // tiny politeness pause
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export async function GET() {
+  try {
+    const r = await fetch(`${process.env.S3_BASE}/index.json`, { cache: "no-store" });
+    return new Response(JSON.stringify({ ok: r.ok, status: r.status }), { headers: { "content-type": "application/json"}});
+  } catch (e:any) {
+    return new Response(JSON.stringify({ ok:false, error: String(e) }), { headers: { "content-type": "application/json"}, status: 500});
   }
-
-  if (!out.length) throw new Error('No data available via Flat Files');
-
-  // Sort + de-dup by timestamp
-  out.sort((a, b) => a.timestamp - b.timestamp);
-  const uniq = Array.from(new Map(out.map(r => [r.timestamp, r])).values())
-                    .sort((a, b) => a.timestamp - b.timestamp);
-
-  console.log(`✓ ${ticker}: Flat Files returned ${uniq.length} bars`);
-  return uniq;
 }
 
+7) Acceptance
 
-Leave fetchPolygonBarsWithRetry (REST) as-is.
-In mode=flat, never fallback to REST; in mode=auto, try flat then REST (current behavior).
+npm run build passes.
 
-3) Minor smoke improvement (if not already done)
+npm run dev → GET /api/index returns JSON with non-empty tickers.
 
-File: scripts/vercel-smoke.mjs
-Use the proper manifest shape.
+Dashboard shows Tickers: N (N > 0).
 
-- if (endpoint.name === 'Index (Manifest)' && parsedResponse.ok) {
--   const tickerCount = parsedResponse.tickers ? parsedResponse.tickers.length : 0;
-+ if (endpoint.name === 'Index (Manifest)' && parsedResponse.ok) {
-+   const tickerCount = parsedResponse.manifest?.tickers?.length ?? 0;
+No fs reads in API routes.
 
+Parquet/CSV fetching uses HTTP from S3; routes using Parquet are runtime="nodejs".
 
-Keep your earlier fixes to /api/strategy/test and the batch warning logic.
-
-4) Commit messages
-
-feat(data): add Polygon S3 Flat Files support (day_aggs_v1) with CSV.gz parsing
-
-chore(smoke): read ticker count from manifest
-
-docs: .env keys for Flat Files S3
+Create commits/PR accordingly.

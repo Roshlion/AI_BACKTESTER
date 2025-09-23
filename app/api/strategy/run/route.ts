@@ -1,6 +1,3 @@
-import { spawn } from "node:child_process";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 
 import { normaliseDsl, runBacktest, type StrategyDSL } from "@/lib/strategy-engine";
@@ -33,28 +30,11 @@ function rowsToCsv(rows: any[]): string {
 }
 
 async function runPythonStrategy(code: string, ticker: string, rows: any[]) {
-  const baseDir = process.env.AI_TMP_DIR ?? process.env.TMPDIR ?? process.env.TEMP ?? "/tmp";
-  const runDir = path.join(baseDir, `ai_backtester_${Date.now()}_${Math.random().toString(16).slice(2)}`);
-  await fs.mkdir(runDir, { recursive: true });
-  const scriptPath = path.join(runDir, "strategy_ml.py");
-  const dataPath = path.join(runDir, "data.csv");
-  await fs.writeFile(scriptPath, code, "utf8");
-  await fs.writeFile(dataPath, rowsToCsv(rows), "utf8");
-
-  const python = process.env.PYTHON_BIN ?? "python";
-  return new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
-    const proc = spawn(python, [scriptPath], { cwd: runDir });
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-    proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-    proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? 0 }));
-  });
+  return {
+    stdout: JSON.stringify({ error: "Python ML strategy execution disabled in S3-only mode" }),
+    stderr: "ML mode requires local filesystem access which is not available",
+    code: 1
+  };
 }
 
 function summariseDslResults(perTicker: Array<{ ticker: string; stats?: any }>, startDate: string, endDate: string) {

@@ -4,7 +4,10 @@
       "Bash(npm run data:manifest:*)",
       "Bash(npm run data:stage:*)",
       "Bash(curl:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": []

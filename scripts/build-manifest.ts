@@ -46,7 +46,6 @@ async function main() {
       Key: `${AWS_PREFIX.replace(/\/?$/, "")}/index.json`,
       Body: body,
       ContentType: "application/json",
-      ACL: "public-read",
     }),
   );
 
@@ -57,3 +56,4 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
