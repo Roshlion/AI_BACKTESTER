@@ -1,4 +1,4 @@
-// lib/strategy-engine.ts
+﻿// lib/strategy-engine.ts
 import type { Row } from "../types/row";
 import { MACD, RSI, SMA, EMA } from "./indicators";
 
@@ -35,7 +35,7 @@ export function normaliseDsl(candidate: any): StrategyDSL {
   const name = typeof candidate.name === "string" && candidate.name.trim() ? candidate.name.trim() : "Custom Strategy";
   const rawRules = Array.isArray(candidate.rules) ? candidate.rules : [];
   const rules = rawRules
-    .map((rule) => {
+    .map((rule: { type?: string; params?: unknown; [k: string]: unknown }) => {
       const type = rule?.type;
       const params = rule?.params;
       if (type !== "macd_cross" && type !== "rsi_threshold" && type !== "sma_cross" && type !== "ema_cross") {
