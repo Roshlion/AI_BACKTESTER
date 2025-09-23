@@ -89,22 +89,60 @@ function toISODate(value: any): string {
   return new Date(timestamp).toISOString().slice(0, 10);
 }
 
+function findField(record: any, aliases: string[]): unknown {
+  for (const alias of aliases) {
+    if (record[alias] != null) {
+      return record[alias];
+    }
+  }
+  return undefined;
+}
+
 function toNumber(value: unknown): number {
-  return typeof value === "bigint" ? Number(value) : Number(value ?? 0);
+  if (value == null) return 0;
+  if (typeof value === "bigint") return Number(value);
+  if (typeof value === "object" && value && "value" in value && "scale" in value) {
+    // Handle DECIMAL with scale
+    const { value: rawValue, scale } = value as { value: any; scale: number };
+    return Number(rawValue) / Math.pow(10, scale);
+  }
+  return Number(value);
 }
 
 export function mapParquetRecord(record: any, fallbackTicker = ""): Row {
+  const tickerValue = findField(record, ["ticker", "symbol"]) ?? fallbackTicker;
+  const dateValue = findField(record, ["date", "timestamp", "t"]);
+  const openValue = findField(record, ["open", "o", "OpenPrice", "openPrice"]);
+  const highValue = findField(record, ["high", "h", "HighPrice", "highPrice"]);
+  const lowValue = findField(record, ["low", "l", "LowPrice", "lowPrice"]);
+  const closeValue = findField(record, ["close", "c", "ClosePrice", "closePrice"]);
+  const volumeValue = findField(record, ["volume", "v", "Volume", "tradedVolume"]);
+  const vwapValue = findField(record, ["vwap", "vw", "VWAP"]);
+  const transactionsValue = findField(record, ["transactions", "count", "n"]);
+
+  // Skip rows with invalid/missing essential data
+  if (openValue == null || highValue == null || lowValue == null || closeValue == null) {
+    console.warn(`Skipping row with missing OHLC data for ${tickerValue}: open=${openValue}, high=${highValue}, low=${lowValue}, close=${closeValue}`);
+    return null as any; // Will be filtered out
+  }
+
+  const date = toISODate(dateValue);
+  if (!date || date === "1970-01-01") {
+    console.warn(`Skipping row with invalid date for ${tickerValue}: ${dateValue}`);
+    return null as any; // Will be filtered out
+  }
+
   return {
-    ticker: String(record.ticker ?? record.symbol ?? fallbackTicker).toUpperCase(),
-    date: toISODate(record.date ?? record.timestamp),
-    timestamp: Number(record.timestamp ?? Date.parse(record.date)),
-    open: toNumber(record.open),
-    high: toNumber(record.high),
-    low: toNumber(record.low),
-    close: toNumber(record.close),
-    volume: toNumber(record.volume),
-    vwap: record.vwap != null ? Number(record.vwap) : undefined,
-    transactions: record.transactions != null ? Number(record.transactions) : undefined,
+    ticker: String(tickerValue).toUpperCase(),
+    date,
+    timestamp: Number(record.timestamp ?? Date.parse(date)),
+    open: toNumber(openValue),
+    high: toNumber(highValue),
+    low: toNumber(lowValue),
+    close: toNumber(closeValue),
+    volume: toNumber(volumeValue),
+    vwap: vwapValue != null ? toNumber(vwapValue) : undefined,
+    transactions: transactionsValue != null ? toNumber(transactionsValue) : undefined,
   };
 }
 
@@ -120,7 +158,10 @@ async function readParquetFromUrl(url: string, fallbackTicker: string): Promise<
   const rows: Row[] = [];
 
   for (let record = await cursor.next(); record; record = await cursor.next()) {
-    rows.push(mapParquetRecord(record, fallbackTicker));
+    const mappedRow = mapParquetRecord(record, fallbackTicker);
+    if (mappedRow) {
+      rows.push(mappedRow);
+    }
   }
 
   await reader.close();
@@ -134,18 +175,7 @@ async function readJsonFromUrl(url: string, fallbackTicker: string): Promise<Row
   }
   const payload = await res.json();
   const data = Array.isArray(payload) ? payload : [];
-  return data.map((record: any) => ({
-    ticker: String(record.ticker ?? fallbackTicker).toUpperCase(),
-    date: toISODate(record.date ?? record.timestamp),
-    timestamp: Number(record.timestamp ?? Date.parse(record.date)),
-    open: toNumber(record.open),
-    high: toNumber(record.high),
-    low: toNumber(record.low),
-    close: toNumber(record.close),
-    volume: toNumber(record.volume),
-    vwap: record.vwap != null ? Number(record.vwap) : undefined,
-    transactions: record.transactions != null ? Number(record.transactions) : undefined,
-  }));
+  return data.map((record: any) => mapParquetRecord(record, fallbackTicker)).filter(Boolean);
 }
 
 export async function readTickerRange(
