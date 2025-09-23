@@ -12,10 +12,9 @@ export const dynamic = "force-dynamic";
 const DEFAULT_DSL: StrategyDSL = {
   name: "SMA Crossover",
   rules: [
-    { type: "sma_cross", params: { fast: 10, slow: 30 }, enter: "long", exit: "long" },
+    { type: "sma_cross", params: { fast: 10, slow: 30, enter: "fast_above", exit: "fast_below" } },
   ],
 };
-
 function uniqueTickers(input: unknown): string[] {
   if (!input) return [];
   const array = Array.isArray(input) ? input : String(input).split(",");
@@ -149,3 +148,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
+
