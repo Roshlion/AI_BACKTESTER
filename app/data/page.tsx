@@ -386,7 +386,7 @@ export default function DataExplorerPage() {
                     <td className="p-4">
                       <div className="flex space-x-2 justify-center">
                         <Link
-                          href={`/dashboard?ticker=${ticker.ticker}`}
+                          href={{ pathname: "/dashboard", query: { ticker: ticker.ticker } }}
                           className="p-1 text-blue-400 hover:text-blue-300 transition-colors"
                           title="View Chart"
                         >

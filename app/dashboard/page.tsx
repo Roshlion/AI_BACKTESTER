@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TickerSelector } from "@/components/ticker-selector";
 import { PriceChart } from "@/components/price-chart";
+import { useSearchParams } from "next/navigation";
 
 export default function DashboardPage() {
   const [selectedTicker, setSelectedTicker] = useState<string>("");
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const t = searchParams.get("ticker");
+    if (t) setSelectedTicker(t.toUpperCase());
+  }, [searchParams]);
 
   return (
     <main className="min-h-screen bg-gray-900">
