@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 import { useEffect, useState } from "react";
 
-type Ticker = { ticker: string; records: number; url: string; firstDate: string; lastDate: string; format: string; };
+type Ticker = { ticker: string; records: number; url: string; firstDate: string; lastDate: string; format: string };
 type Manifest = { version: number; source: string; asOf: string; tickers: Ticker[] };
 type IndexResp = { ok: boolean; manifest: Manifest };
 
