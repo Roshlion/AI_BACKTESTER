@@ -1,4 +1,4 @@
-import fs from "fs-extra";
+﻿import fs from "fs-extra";
 import path from "path";
 import { ParquetSchema, ParquetWriter, ParquetReader } from "parquetjs-lite";
 import { mapSicToCategory } from "./sic-map";
@@ -63,9 +63,9 @@ export async function readTickerSeed(csvPath: string): Promise<string[]> {
 
 // ...above code unchanged...
 
-  const lines = content
+  const lines: string[] = content
     .split(/\r?\n/)
-    .map((line: string) => line.trim())   // <— add : string here
+    .map((line: string) => line.trim())
     .filter(Boolean);
 
   // If you have helpers in this file, give them explicit types too:
@@ -110,7 +110,7 @@ export async function readTickerSeed(csvPath: string): Promise<string[]> {
   if (headerLower.includes(",")) {
     const tickerColIndex = 0;
     return rows
-      .map((row) => row.split(",")[tickerColIndex]?.trim())
+      .map((row: string) => row.split(",")[tickerColIndex]?.trim())
       .filter((value): value is string => !!value);
   }
 
@@ -266,3 +266,4 @@ export async function ensureTickerDataset(
     },
   };
 }
+
