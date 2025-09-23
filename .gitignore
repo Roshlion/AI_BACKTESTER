@@ -11,7 +11,7 @@ node_modules/
 out/
 
 # Data files (exclude from repo)
-data/
+/data/
 
 # Logs
 *.log
