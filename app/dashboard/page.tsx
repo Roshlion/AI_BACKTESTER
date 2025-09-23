@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useState } from "react";
 
 type Ticker = { ticker: string; records: number; url: string; firstDate: string; lastDate: string; format: string };
