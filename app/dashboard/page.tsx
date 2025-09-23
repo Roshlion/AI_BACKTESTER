@@ -1,141 +1,166 @@
-'use client'
+"use client";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
-import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { Beaker, LineChart as LineChartIcon, Database } from 'lucide-react'
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { Database, LineChart as LineChartIcon, Beaker } from "lucide-react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
-type Spark = { ticker: string; bars: { date: string; close: number }[]; last?: { o:number; h:number; l:number; c:number } }
-type Meta = { generatedAt:string; summary:{ tickers:number; records:number; jsonSizeHuman:string; parquetSizeHuman:string; reductionPercent:number } }
+type ManifestItem = {
+  ticker: string;
+  name?: string;
+  sector?: string;
+  industry?: string;
+  records?: number;
+  firstDate?: string;
+  lastDate?: string;
+};
+
+type IndexResponse = {
+  ok: boolean;
+  total: number;
+  asOf?: string;
+  results: ManifestItem[];
+};
 
 export default function DashboardPage() {
-  const [tickers, setTickers] = useState('AAPL,MSFT,GOOGL,AMZN')
-  const [start, setStart] = useState('2024-01-02')
-  const [end, setEnd] = useState('2024-03-28')
-  const [loading, setLoading] = useState(false)
-  const [rows, setRows] = useState<Spark[]>([])
-  const [meta, setMeta] = useState<Meta|null>(null)
+  const [manifest, setManifest] = useState<ManifestItem[]>([]);
+  const [asOf, setAsOf] = useState<string | null>(null);
+  const [total, setTotal] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    const fetchManifest = async () => {
+      setLoading(true);
       try {
-        const r = await fetch('/api/local-data?mode=metadata', { cache: 'no-store' })
-        const j = await r.json()
-        if (j?.success && j?.metadata) setMeta(j.metadata)
-      } catch {}
-    })()
-  }, [])
-
-  const fetchBatch = async () => {
-    setLoading(true)
-    try {
-      const r = await fetch('/api/local-batch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ tickers: tickers.split(',').map(t=>t.trim().toUpperCase()).filter(Boolean), startDate: start, endDate: end })
-      })
-      const j = await r.json()
-      setRows(Array.isArray(j?.data) ? j.data : [])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const cards = useMemo(() =>
-    rows.map(row => {
-      const last = row.bars.at(-1)
-      return {
-        ticker: row.ticker,
-        lastClose: last?.close ?? null,
-        ohlc: last ? { o: last.close, h: last.close, l: last.close, c: last.close } : row.last
+        const res = await fetch("/api/index?limit=1000", { cache: "no-store" });
+        const json: IndexResponse = await res.json();
+        if (!json.ok) {
+          throw new Error((json as any).error ?? "Failed to load manifest");
+        }
+        if (!cancelled) {
+          setManifest(json.results ?? []);
+          setTotal(json.total ?? json.results.length ?? 0);
+          setAsOf(json.asOf ?? null);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    }), [rows])
+    };
+    fetchManifest();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const totals = useMemo(() => {
+    const totalRecords = manifest.reduce((sum, item) => sum + (item.records ?? 0), 0);
+    return { totalRecords };
+  }, [manifest]);
+
+  const sectorData = useMemo(() => {
+    const counts = new Map<string, number>();
+    manifest.forEach((item) => {
+      const key = item.sector && item.sector.trim().length > 0 ? item.sector : "Unclassified";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([sector, count]) => ({ sector, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [manifest]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-white">AI Backtester â€” Dashboard</h1>
-          <div className="flex gap-3">
-            <Link href="/backtester" className="px-3 py-2 border border-white/20 rounded-lg text-white/90 hover:text-white hover:border-white">Backtester</Link>
-            <Link href="/strategy" className="px-3 py-2 border border-emerald-400/40 rounded-lg text-emerald-200 hover:text-emerald-100">Strategy Lab</Link>
-            <Link href="/data" className="px-3 py-2 border border-white/20 rounded-lg text-white/90 hover:text-white hover:border-white">Data Warehouse</Link>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-10">
+        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold">AI Backtester Dashboard</h1>
+            <p className="text-sm text-slate-300">Universe coverage and data freshness at a glance.</p>
           </div>
-        </div>
+          <nav className="flex gap-3 text-sm text-slate-300">
+            <Link className="rounded-lg border border-white/10 px-3 py-2 hover:border-white/40 hover:text-white" href="/data">
+              Data Warehouse
+            </Link>
+            <Link className="rounded-lg border border-white/10 px-3 py-2 hover:border-white/40 hover:text-white" href="/strategy">
+              Strategy Lab
+            </Link>
+          </nav>
+        </header>
 
-        {/* Controls */}
-        <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-4 mb-6">
-          <div className="grid md:grid-cols-3 gap-3">
+        {error && (
+          <div className="rounded-xl border border-rose-500/40 bg-rose-950/40 p-4 text-sm text-rose-200">{error}</div>
+        )}
+
+        <section className="grid gap-4 md:grid-cols-3">
+          <StatCard label="Total tickers" value={loading ? "–" : total.toLocaleString()} />
+          <StatCard label="Total records" value={loading ? "–" : totals.totalRecords.toLocaleString()} />
+          <StatCard label="Last refresh" value={asOf ? new Date(asOf).toLocaleString() : "Unknown"} />
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <div className="mb-4 flex items-center justify-between">
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Tickers (comma)</label>
-              <input value={tickers} onChange={e=>setTickers(e.target.value)} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" />
+              <h2 className="text-lg font-semibold">Universe by sector</h2>
+              <p className="text-xs text-slate-300">Distribution of tickers currently available in the manifest.</p>
             </div>
-            <div>
-              <label className="block text-sm text-gray-300 mb-1">Start</label>
-              <input type="date" value={start} onChange={e=>setStart(e.target.value)} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-300 mb-1">End</label>
-              <input type="date" value={end} onChange={e=>setEnd(e.target.value)} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" />
-            </div>
+            <span className="text-xs text-slate-400">{loading ? "Loading sectors…" : ${sectorData.length} sectors}</span>
           </div>
-          <div className="mt-3">
-            <button onClick={fetchBatch} disabled={loading} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">
-              {loading ? 'Loadingâ€¦' : 'Load Watchlist'}
-            </button>
+          <div className="h-72">
+            {sectorData.length ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={sectorData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis dataKey="sector" tick={{ fill: "#cbd5f5", fontSize: 12 }} interval={0} angle={-25} textAnchor="end" height={80} />
+                  <YAxis tick={{ fill: "#cbd5f5" }} allowDecimals={false} />
+                  <Tooltip wrapperStyle={{ backgroundColor: "#0f172a", border: "1px solid rgba(255,255,255,0.1)" }} />
+                  <Bar dataKey="count" fill="#34d399" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-slate-400">{loading ? "Loading…" : "No sector data"}</div>
+            )}
           </div>
-          {meta && (
-            <div className="mt-3 text-xs text-emerald-200/80">
-              {meta.summary.tickers} tickers â€¢ {meta.summary.records} records â€¢ Storage savings {meta.summary.reductionPercent}%
-            </div>
-          )}
-        </div>
+        </section>
 
-        {/* Grid */}
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {rows.map(({ ticker, bars }) => (
-            <div key={ticker} className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <LineChartIcon className="w-4 h-4 text-white/80" />
-                  <div className="text-white font-semibold">{ticker}</div>
-                </div>
-                <div className="text-gray-300 text-xs">{bars[0]?.date ?? ''} â†’ {bars.at(-1)?.date ?? ''}</div>
-              </div>
-              <div className="h-40">
-                {bars.length ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={bars} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" hide />
-                      <YAxis hide />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="close" dot={false} strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-gray-400">No data</div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Shortcuts */}
-        <div className="mt-8 grid md:grid-cols-3 gap-4">
-          <Link href="/backtester" className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl p-4 text-white hover:border-white/40">
-            <LineChartIcon className="w-5 h-5" /> Backtester
-          </Link>
-          <Link href="/strategy" className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl p-4 text-emerald-200 hover:border-emerald-300/40">
-            <Beaker className="w-5 h-5" /> Strategy Lab
-          </Link>
-          <Link href="/data" className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl p-4 text-white hover:border-white/40">
-            <Database className="w-5 h-5" /> Data Warehouse
-          </Link>
-        </div>
+        <section className="grid gap-4 md:grid-cols-3">
+          <LinkCard href="/data" icon={<Database className="h-5 w-5" />} title="Explore Data" caption="Search, filter, and download parquet datasets." />
+          <LinkCard href="/strategy" icon={<Beaker className="h-5 w-5" />} title="Run Strategies" caption="Execute DSL or ML strategies across the universe." />
+          <LinkCard href="/backtester" icon={<LineChartIcon className="h-5 w-5" />} title="Legacy Backtester" caption="Access historical single-ticker tooling." />
+        </section>
       </div>
     </div>
-  )
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+      <p className="text-sm text-slate-300">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function LinkCard({ href, icon, title, caption }: { href: string; icon: ReactNode; title: string; caption: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-left text-slate-200 transition hover:border-white/30 hover:text-white"
+    >
+      <span className="mt-1 text-emerald-300">{icon}</span>
+      <span>
+        <div className="text-base font-semibold text-white">{title}</div>
+        <div className="text-sm text-slate-300">{caption}</div>
+      </span>
+    </Link>
+  );
 }

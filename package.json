@@ -18,7 +18,8 @@
     "test-simple": "node test-simple.js",
     "smoke:strategy": "node scripts/strategy-smoke.mjs",
     "smoke:old": "node --experimental-fetch scripts/smoke-all.mjs",
-    "smoke:base": "cross-env BASE_URL=http://localhost:3000 node --experimental-fetch scripts/smoke-all.mjs"
+    "smoke:base": "cross-env BASE_URL=http://localhost:3000 node --experimental-fetch scripts/smoke-all.mjs",
+    "data:build": "tsx scripts/universe-build.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.893.0",
@@ -28,7 +29,6 @@
     "fs-extra": "^11.3.2",
     "lucide-react": "^0.294.0",
     "next": "14.0.4",
-    "openai": "^4.57.0",
     "parquetjs-lite": "^0.8.7",
     "react": "^18",
     "react-dom": "^18",
@@ -45,6 +45,7 @@
     "eslint-config-next": "14.0.4",
     "postcss": "^8",
     "tailwindcss": "^3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "tsx": "^4.19.2"
   }
 }

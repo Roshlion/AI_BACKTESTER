@@ -2,74 +2,47 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { readTickerRange, loadManifest, getDataSource } from "@/lib/safeParquet";
+import { readTickerRange, loadManifest } from "@/lib/safeParquet";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const mode = searchParams.get("mode") ?? "";
-    const ticker = searchParams.get("ticker") ?? "AAPL";
+    const ticker = searchParams.get("ticker")?.toUpperCase();
+    const startDate = searchParams.get("start") ?? searchParams.get("startDate") ?? undefined;
+    const endDate = searchParams.get("end") ?? searchParams.get("endDate") ?? undefined;
 
-    if (mode === "metadata" && ticker) {
-      // Get metadata for specific ticker from manifest
-      try {
-        const manifest = await loadManifest(req);
-        const tickerInfo = manifest.tickers.find(t => t.ticker.toUpperCase() === ticker.toUpperCase());
-
-        if (tickerInfo) {
-          return NextResponse.json({
-            ok: true,
-            ticker: tickerInfo.ticker,
-            records: tickerInfo.records,
-            firstDate: tickerInfo.firstDate,
-            lastDate: tickerInfo.lastDate,
-            source: manifest.source
-          });
-        } else {
-          // Ticker not in manifest, return empty metadata
-          return NextResponse.json({
-            ok: true,
-            ticker: ticker.toUpperCase(),
-            records: 0,
-            firstDate: null,
-            lastDate: null,
-            source: manifest.source,
-            note: "Ticker not found in manifest"
-          });
-        }
-      } catch (error) {
-        console.error('Error getting metadata:', error);
-        return NextResponse.json({
-          ok: true,
-          ticker: ticker.toUpperCase(),
-          records: 0,
-          firstDate: null,
-          lastDate: null,
-          source: 'public',
-          note: "Error loading manifest"
-        });
-      }
+    if (!ticker) {
+      return NextResponse.json({ ok: false, error: "ticker required" }, { status: 400 });
     }
 
-    // Load ticker data (fallback to AAPL if none specified)
-    const rows = await readTickerRange(req, ticker, '1900-01-01', '2099-12-31');
+    const manifest = await loadManifest(req);
+    const entry = manifest.tickers.find((item) => item.ticker.toUpperCase() === ticker);
 
-    if (rows.length === 0) {
+    const rows = await readTickerRange(req, ticker, startDate, endDate);
+    const count = rows.length;
+
+    if (!count) {
       return NextResponse.json({
         ok: true,
-        ticker: ticker.toUpperCase(),
+        ticker,
         rows: [],
-        note: "No data"
+        count: 0,
+        range: { start: startDate ?? null, end: endDate ?? null },
+        note: "No data",
+        source: entry?.url ?? null,
       });
     }
 
     return NextResponse.json({
       ok: true,
-      ticker: ticker.toUpperCase(),
-      rows
+      ticker,
+      count,
+      range: { start: startDate ?? rows[0].date, end: endDate ?? rows.at(-1)?.date },
+      rows,
+      source: entry?.url ?? null,
     });
-  } catch (e: any) {
-    console.error('Error in /api/local-data:', e);
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  } catch (error) {
+    console.error("/api/local-data", error);
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }

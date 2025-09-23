@@ -1,306 +1,446 @@
-﻿'use client'
+"use client";
 
-export const dynamic = 'force-dynamic'
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { UploadCloud, Trash2 } from "lucide-react";
 
-import { useMemo, useState } from 'react'
-import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceDot
-} from 'recharts'
-import { Download, Wand2, Beaker, ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
+type ManifestItem = {
+  ticker: string;
+  name?: string;
+  sector?: string;
+  industry?: string;
+};
 
-type Mkt = {
-  date: string
-  open: number
-  high: number
-  low: number
-  close: number
-  volume: number
-  timestamp: number
+type StrategySummary = {
+  mode: "dsl" | "ml";
+  requestedTickers: number;
+  processedTickers: number;
+  avgReturnPct?: number;
+  totalTrades?: number;
+  startDate: string;
+  endDate: string;
+};
+
+type DslPerTicker = {
+  ticker: string;
+  stats?: {
+    totalReturnPct: number;
+    trades: number;
+    winRatePct: number;
+    avgTradePct: number;
+  };
+};
+
+type MlPerTicker = {
+  ticker: string;
+  result?: Record<string, unknown>;
+};
+
+type ApiResponse = {
+  ok: boolean;
+  summary?: StrategySummary;
+  perTicker?: Array<DslPerTicker | MlPerTicker>;
+  logs?: string[];
+  error?: string;
+};
+
+const DEFAULT_DSL = {
+  name: "SMA Crossover",
+  rules: [
+    { type: "sma_cross", params: { fast: 10, slow: 30 }, enter: "long", exit: "long" },
+  ],
+};
+
+const DEFAULT_PYTHON = import pandas as pd\n\n# Load data\ndf = pd.read_csv('data.csv', parse_dates=['date'])\ndf['return'] = df['close'].pct_change().fillna(0)\nresult = {\n    'ticker': df['ticker'].iloc[0] if 'ticker' in df.columns else 'UNKNOWN',\n    'totalReturnPct': float((df['return'] + 1).prod() - 1) * 100,\n    'bars': len(df)\n}\nprint(result);
+
+function parseTickers(input: string): string[] {
+  return input
+    .split(/[\s,\n\t]+/)
+    .map((value) => value.trim().toUpperCase())
+    .filter((value) => value.length > 0);
 }
-type Trade = { entryIdx: number; exitIdx: number; entryPrice: number; exitPrice: number; pnl: number }
-type Stats = { totalReturnPct: number; trades: number; winRatePct: number; avgTradePct: number }
 
-type StrategyDsl = Record<string, any> | null
+export default function StrategyPage() {
+  const [manifest, setManifest] = useState<ManifestItem[]>([]);
+  const [sector, setSector] = useState("all");
+  const [industry, setIndustry] = useState("all");
+  const [manualInput, setManualInput] = useState("");
+  const [manualTickers, setManualTickers] = useState<string[]>([]);
+  const [mode, setMode] = useState<"dsl" | "ml">("dsl");
+  const [dslText, setDslText] = useState(JSON.stringify(DEFAULT_DSL, null, 2));
+  const [pythonCode, setPythonCode] = useState(DEFAULT_PYTHON);
+  const [startDate, setStartDate] = useState("2024-01-02");
+  const [endDate, setEndDate] = useState("2024-06-28");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<StrategySummary | null>(null);
+  const [perTicker, setPerTicker] = useState<Array<DslPerTicker | MlPerTicker>>([]);
+  const [logs, setLogs] = useState<string[]>([]);
 
-type MetaUsed = { start: string; end: string } | null
+  useEffect(() => {
+    let cancelled = false;
+    const fetchManifest = async () => {
+      try {
+        const res = await fetch("/api/index?limit=1000", { cache: "no-store" });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error ?? "Failed to fetch manifest");
+        if (!cancelled) setManifest(json.results ?? []);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      }
+    };
+    fetchManifest();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-export default function StrategyLabPage() {
-  const [prompt, setPrompt] = useState('MACD crossover enter; exit when RSI > 70; fast 12 slow 26 signal 9')
-  const [ticker, setTicker] = useState('AAPL')
-  const [startDate, setStartDate] = useState('2024-01-02')
-  const [endDate, setEndDate] = useState('2024-03-28')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const sectorOptions = useMemo(() => {
+    const set = new Set<string>();
+    manifest.forEach((item) => {
+      if (item.sector) set.add(item.sector);
+    });
+    return Array.from(set).sort();
+  }, [manifest]);
 
-  const [bars, setBars] = useState<Mkt[]>([])
-  const [trades, setTrades] = useState<Trade[]>([])
-  const [equity, setEquity] = useState<number[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [dsl, setDsl] = useState<StrategyDsl>(null)
-  const [metaUsed, setMetaUsed] = useState<MetaUsed>(null)
+  const industryOptions = useMemo(() => {
+    const set = new Set<string>();
+    manifest.forEach((item) => {
+      if (item.industry) set.add(item.industry);
+    });
+    return Array.from(set).sort();
+  }, [manifest]);
+
+  const filteredTickers = useMemo(() => {
+    return manifest
+      .filter((item) => (sector === "all" ? true : item.sector === sector))
+      .filter((item) => (industry === "all" ? true : item.industry === industry))
+      .map((item) => item.ticker);
+  }, [manifest, sector, industry]);
+
+  const tickersToRun = useMemo(() => {
+    const set = new Set<string>();
+    manualTickers.forEach((ticker) => set.add(ticker));
+    filteredTickers.forEach((ticker) => set.add(ticker));
+    return Array.from(set);
+  }, [manualTickers, filteredTickers]);
+
+  const handleApplyManual = () => {
+    setManualTickers(parseTickers(manualInput));
+  };
+
+  const handleClearManual = () => {
+    setManualInput("");
+    setManualTickers([]);
+  };
+
+  const handleCsvUpload = async (file: File) => {
+    const text = await file.text();
+    const entries = parseTickers(text);
+    setManualTickers((prev) => Array.from(new Set([...prev, ...entries])));
+  };
 
   const onRun = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/strategy/run', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt, ticker, startDate, endDate })
-      })
-      const json = await res.json()
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Strategy run failed')
+    setError(null);
+    setSummary(null);
+    setPerTicker([]);
+    setLogs([]);
 
-      setDsl(json.dsl || null)
-      setTrades(json.result?.trades ?? [])
-      setEquity(json.result?.equity ?? [])
-      setStats(json.result?.stats ?? null)
-      setMetaUsed(json.meta?.used ?? null)
-
-      const q = new URLSearchParams({ ticker, startDate, endDate })
-      const lr = await fetch(`/api/local-data?${q.toString()}`, { cache: 'no-store' })
-      const lj = await lr.json()
-      setBars(Array.isArray(lj.data) ? lj.data : [])
-    } catch (e: any) {
-      setError(String(e.message || e))
-    } finally {
-      setLoading(false)
+    if (!tickersToRun.length) {
+      setError("Select at least one ticker via filters, manual input, or CSV upload.");
+      return;
     }
-  }
 
-  const markers = useMemo(() => {
-    const dates = bars.map(b => b.date)
-    return trades.flatMap((t) => {
-      const entryDate = dates[t.entryIdx] ?? null
-      const exitDate = dates[t.exitIdx] ?? null
-      return [
-        entryDate ? { type: 'buy' as const, date: entryDate } : null,
-        exitDate ? { type: 'sell' as const, date: exitDate } : null,
-      ].filter(Boolean) as { type: 'buy' | 'sell'; date: string }[]
-    })
-  }, [bars, trades])
+    let payload: any = {
+      tickers: tickersToRun,
+      startDate,
+      endDate,
+      mode,
+    };
 
-  const exportTradesCsv = () => {
-    if (!trades.length) return
-    const header = 'entryIdx,exitIdx,entryPrice,exitPrice,pnlPct\n'
-    const rows = trades.map(t => [t.entryIdx, t.exitIdx, t.entryPrice, t.exitPrice, (t.pnl * 100).toFixed(4)].join(',')).join('\n')
-    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${ticker}_${startDate}_${endDate}_trades.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+    if (mode === "dsl") {
+      try {
+        payload.dsl = JSON.parse(dslText);
+      } catch (err) {
+        setError("DSL JSON is invalid. Please fix and try again.");
+        return;
+      }
+    } else {
+      if (!pythonCode.trim()) {
+        setError("Provide Python code for ML mode.");
+        return;
+      }
+      payload.code = pythonCode;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/strategy/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json: ApiResponse = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? "Strategy run failed");
+      }
+      setSummary(json.summary ?? null);
+      setPerTicker(json.perTicker ?? []);
+      setLogs(json.logs ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-gray-300 hover:text-white">
-              <ArrowLeft className="w-5 h-5 mr-2 inline" /> Dashboard
-            </Link>
-            <h1 className="text-3xl font-bold text-white">Strategy Lab</h1>
-            <span className="inline-flex items-center rounded-full border border-emerald-400/60 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-200">
-              Local Parquet
-            </span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10">
+        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm text-slate-300">AI Strategy Lab</p>
+            <h1 className="text-3xl font-semibold">Multi-ticker strategies</h1>
           </div>
-          <div className="flex gap-3">
-            <Link href="/backtester" className="text-gray-300 hover:text-white">Backtester</Link>
-            <Link href="/data" className="text-gray-300 hover:text-white">Data Warehouse</Link>
-          </div>
-        </div>
+          <Link className="text-sm text-emerald-300 hover:text-emerald-200" href="/dashboard">
+            ? Back to dashboard
+          </Link>
+        </header>
 
-        <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-6 mb-6">
+        <section className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <div className="mb-4 flex flex-wrap gap-4 text-sm text-slate-300">
+            <label className="flex items-center gap-2">
+              <input type="radio" value="dsl" checked={mode === "dsl"} onChange={() => setMode("dsl")} /> DSL mode
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" value="ml" checked={mode === "ml"} onChange={() => setMode("ml")} /> ML mode
+            </label>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Strategy prompt</label>
+            <div className="md:col-span-2 space-y-2">
+              <label className="block text-sm text-slate-300">Manual tickers (comma or newline separated)</label>
               <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                placeholder="Describe your strategy (MACD/RSI/SMA/EMA rules)…"
+                rows={3}
+                value={manualInput}
+                onChange={(event) => setManualInput(event.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
               />
-              <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-                <Wand2 className="w-4 h-4" /> LLM → JSON DSL → local parquet backtest
+              <div className="flex gap-3 text-sm text-slate-300">
+                <button className="rounded-lg border border-emerald-400/60 px-3 py-1 text-emerald-200 hover:border-emerald-300" onClick={handleApplyManual}>
+                  Apply
+                </button>
+                <button className="flex items-center gap-1 rounded-lg border border-rose-400/50 px-3 py-1 text-rose-200 hover:border-rose-300" onClick={handleClearManual}>
+                  <Trash2 className="h-4 w-4" /> Clear
+                </button>
               </div>
             </div>
-            <div className="grid gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Ticker</label>
+            <div className="space-y-2">
+              <label className="block text-sm text-slate-300">Upload tickers (CSV)</label>
+              <label className="flex h-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-600 bg-slate-900 text-sm text-slate-300 hover:border-slate-400">
+                <UploadCloud className="mb-1 h-5 w-5" />
+                <span>Drop file or click</span>
                 <input
-                  value={ticker}
-                  onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
-                  placeholder="AAPL"
+                  className="hidden"
+                  type="file"
+                  accept=".csv,.txt"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) handleCsvUpload(file);
+                    event.target.value = "";
+                  }}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Start</label>
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">End</label>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" />
-                </div>
-              </div>
-              <button
-                onClick={onRun}
-                disabled={loading}
-                className="w-full flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm text-slate-300">Sector filter</label>
+              <select
+                value={sector}
+                onChange={(event) => setSector(event.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
               >
-                {loading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                ) : <Beaker className="w-4 h-4 mr-2" />}
-                {loading ? 'Running…' : 'Run Strategy'}
-              </button>
+                <option value="all">All sectors</option>
+                {sectorOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-4 gap-4 mb-6">
-          <div className="text-center bg-white/10 border border-white/10 rounded-xl p-4">
-            <div className="text-2xl font-bold text-green-400">{stats ? `${stats.totalReturnPct.toFixed(2)}%` : '--'}</div>
-            <div className="text-sm text-gray-300">Total Return</div>
-          </div>
-          <div className="text-center bg-white/10 border border-white/10 rounded-xl p-4">
-            <div className="text-2xl font-bold text-blue-400">{stats ? stats.trades : '--'}</div>
-            <div className="text-sm text-gray-300">Trades</div>
-          </div>
-          <div className="text-center bg-white/10 border border-white/10 rounded-xl p-4">
-            <div className="text-2xl font-bold text-yellow-400">{stats ? `${stats.winRatePct.toFixed(1)}%` : '--'}</div>
-            <div className="text-sm text-gray-300">Win Rate</div>
-          </div>
-          <div className="text-center bg-white/10 border border-white/10 rounded-xl p-4">
-            <div className="text-2xl font-bold text-purple-400">{stats ? `${stats.avgTradePct.toFixed(2)}%` : '--'}</div>
-            <div className="text-sm text-gray-300">Avg Trade</div>
-          </div>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-white font-semibold">Price with trade markers</h2>
-              <div className="text-xs text-gray-300">{metaUsed ? `${metaUsed.start} → ${metaUsed.end}` : ''}</div>
-            </div>
-            <div className="h-80">
-              {bars.length ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={bars} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis yAxisId="price" />
-                    <Tooltip />
-                    <Legend />
-                    <Line yAxisId="price" type="monotone" dataKey="close" name="Close" dot={false} strokeWidth={2} />
-                    {markers.map((m, i) => (
-                      <ReferenceDot key={i} x={m.date} y={(() => {
-                        const b = bars.find(bb => bb.date === m.date)
-                        return b?.close ?? 0
-                      })()}
-                      r={4}
-                      label={m.type === 'buy' ? '▲' : '▼'}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-400">No data</div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-white font-semibold">Equity Curve</h2>
-            </div>
-            <div className="h-80">
-              {equity.length ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={equity.map((v, i) => ({ i, equity: v }))} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="i" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="equity" name="Equity (index)" dot={false} strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-400">No equity</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-6">
-          <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-white font-semibold">Trade Log</h2>
-              <button
-                onClick={exportTradesCsv}
-                disabled={!trades.length}
-                className="flex items-center px-3 py-2 border border-gray-400 text-gray-300 hover:text-white hover:border-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            <div>
+              <label className="mb-1 block text-sm text-slate-300">Industry filter</label>
+              <select
+                value={industry}
+                onChange={(event) => setIndustry(event.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
               >
-                <Download className="w-4 h-4 mr-2" /> Export CSV
-              </button>
+                <option value="all">All industries</option>
+                {industryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="overflow-auto max-h-96 text-sm">
-              {trades.length ? (
-                <table className="w-full text-left">
-                  <thead className="text-gray-300">
-                    <tr>
-                      <th className="py-1 pr-3">#</th>
-                      <th className="py-1 pr-3">Entry</th>
-                      <th className="py-1 pr-3">Exit</th>
-                      <th className="py-1 pr-3">Entry Px</th>
-                      <th className="py-1 pr-3">Exit Px</th>
-                      <th className="py-1 pr-3">PnL %</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-gray-100">
-                    {trades.map((t, idx) => {
-                      const eDate = bars[t.entryIdx]?.date ?? '-'
-                      const xDate = bars[t.exitIdx]?.date ?? '-'
-                      return (
-                        <tr key={idx} className="border-t border-white/10">
-                          <td className="py-1 pr-3">{idx + 1}</td>
-                          <td className="py-1 pr-3">{eDate}</td>
-                          <td className="py-1 pr-3">{xDate}</td>
-                          <td className="py-1 pr-3">{t.entryPrice.toFixed(2)}</td>
-                          <td className="py-1 pr-3">{t.exitPrice.toFixed(2)}</td>
-                          <td className="py-1 pr-3">{(t.pnl * 100).toFixed(2)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="text-gray-400">No trades.</div>
-              )}
+            <div className="space-y-2">
+              <label className="block text-sm text-slate-300">Selected tickers</label>
+              <div className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs leading-5 text-slate-200">
+                {tickersToRun.length ? tickersToRun.join(", ") : "�"}
+              </div>
+              <p className="text-xs text-slate-400">Filters auto-populate tickers; manual entries are merged in.</p>
             </div>
           </div>
+        </section>
 
-          <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-6">
-            <h2 className="text-white font-semibold mb-2">Strategy (DSL)</h2>
-            <pre className="text-xs text-emerald-200/90 bg-black/30 rounded-lg p-3 overflow-auto max-h-96">
-{dsl ? JSON.stringify(dsl, null, 2) : 'Run a strategy to see the generated JSON DSL…'}
-            </pre>
+        <section className="grid gap-4 md:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-sm text-slate-300">Start date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+            />
           </div>
-        </div>
+          <div>
+            <label className="mb-1 block text-sm text-slate-300">End date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={onRun}
+              disabled={loading}
+              className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {loading ? "Running�" : Run on  ticker}
+            </button>
+          </div>
+        </section>
+
+        {mode === "dsl" ? (
+          <section className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <label className="mb-2 block text-sm text-slate-300">Strategy DSL (JSON)</label>
+            <textarea
+              rows={8}
+              value={dslText}
+              onChange={(event) => setDslText(event.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-emerald-200"
+            />
+          </section>
+        ) : (
+          <section className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <label className="mb-2 block text-sm text-slate-300">Python strategy code</label>
+            <textarea
+              rows={10}
+              value={pythonCode}
+              onChange={(event) => setPythonCode(event.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-emerald-200"
+            />
+            <p className="mt-2 text-xs text-slate-400">Script must print JSON (e.g. {"totalReturnPct": 12}). It runs once per ticker.</p>
+          </section>
+        )}
 
         {error && (
-          <div className="mt-6 bg-red-500/20 border border-red-500/50 rounded-xl p-4">
-            <div className="text-red-200">Error: {error}</div>
-          </div>
+          <div className="rounded-xl border border-rose-500/40 bg-rose-950/40 p-4 text-sm text-rose-200">{error}</div>
+        )}
+
+        {summary && (
+          <section className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <h2 className="text-lg font-semibold">Summary</h2>
+            <div className="mt-4 grid gap-4 md:grid-cols-4 text-sm text-slate-200">
+              <div>
+                <div className="text-slate-400">Mode</div>
+                <div className="text-white capitalize">{summary.mode}</div>
+              </div>
+              <div>
+                <div className="text-slate-400">Tickers processed</div>
+                <div className="text-white">{summary.processedTickers} / {summary.requestedTickers}</div>
+              </div>
+              {summary.mode === "dsl" && (
+                <div>
+                  <div className="text-slate-400">Average return</div>
+                  <div className="text-white">{summary.avgReturnPct?.toFixed(2)}%</div>
+                </div>
+              )}
+              {summary.mode === "dsl" && (
+                <div>
+                  <div className="text-slate-400">Total trades</div>
+                  <div className="text-white">{summary.totalTrades}</div>
+                </div>
+              )}
+              <div>
+                <div className="text-slate-400">Date range</div>
+                <div className="text-white">{summary.startDate} ? {summary.endDate}</div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {perTicker.length > 0 && (
+          <section className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <h2 className="mb-3 text-lg font-semibold">Per-ticker results</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="border-b border-white/10 text-left text-slate-300">
+                  <tr>
+                    <th className="px-4 py-2">Ticker</th>
+                    {summary?.mode === "dsl" ? (
+                      <>
+                        <th className="px-4 py-2">Return %</th>
+                        <th className="px-4 py-2">Trades</th>
+                        <th className="px-4 py-2">Win rate %</th>
+                        <th className="px-4 py-2">Avg trade %</th>
+                      </>
+                    ) : (
+                      <th className="px-4 py-2">Output</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {perTicker.map((item) => (
+                    <tr key={item.ticker} className="border-b border-white/5 text-slate-100">
+                      <td className="px-4 py-2 font-semibold">{item.ticker}</td>
+                      {"stats" in item && item.stats ? (
+                        <>
+                          <td className="px-4 py-2">{item.stats.totalReturnPct.toFixed(2)}</td>
+                          <td className="px-4 py-2">{item.stats.trades}</td>
+                          <td className="px-4 py-2">{item.stats.winRatePct.toFixed(1)}</td>
+                          <td className="px-4 py-2">{item.stats.avgTradePct.toFixed(2)}</td>
+                        </>
+                      ) : (
+                        <td className="px-4 py-2 font-mono text-xs text-emerald-200">
+                          {JSON.stringify((item as MlPerTicker).result ?? {}, null, 2)}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {logs.length > 0 && (
+          <section className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <h2 className="mb-3 text-lg font-semibold">Logs</h2>
+            <ul className="list-disc space-y-1 pl-6 text-sm text-slate-300">
+              {logs.map((line, index) => (
+                <li key={${line}-}>{line}</li>
+              ))}
+            </ul>
+          </section>
         )}
       </div>
     </div>
-  )
+  );
 }
