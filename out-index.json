@@ -1,0 +1,911 @@
+{
+    "ok":  true,
+    "manifest":  {
+                     "version":  1,
+                     "source":  "public",
+                     "asOf":  "2025-09-22T01:27:10.761Z",
+                     "generatedAt":  "2025-09-22T01:27:10.762Z",
+                     "tickers":  [
+                                     {
+                                         "ticker":  "AAPL",
+                                         "url":  "/data/AAPL.json",
+                                         "format":  "json",
+                                         "records":  389,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2025-09-19",
+                                         "sizeBytes":  82440
+                                     },
+                                     {
+                                         "ticker":  "ABBV",
+                                         "url":  "/data/ABBV.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13283
+                                     },
+                                     {
+                                         "ticker":  "ABNB",
+                                         "url":  "/data/ABNB.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13276
+                                     },
+                                     {
+                                         "ticker":  "ADI",
+                                         "url":  "/data/ADI.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13232
+                                     },
+                                     {
+                                         "ticker":  "ADSK",
+                                         "url":  "/data/ADSK.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13257
+                                     },
+                                     {
+                                         "ticker":  "AMAT",
+                                         "url":  "/data/AMAT.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13320
+                                     },
+                                     {
+                                         "ticker":  "AMD",
+                                         "url":  "/data/AMD.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13351
+                                     },
+                                     {
+                                         "ticker":  "AMZN",
+                                         "url":  "/data/AMZN.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13406
+                                     },
+                                     {
+                                         "ticker":  "AVGO",
+                                         "url":  "/data/AVGO.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13502
+                                     },
+                                     {
+                                         "ticker":  "AXP",
+                                         "url":  "/data/AXP.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13233
+                                     },
+                                     {
+                                         "ticker":  "BA",
+                                         "url":  "/data/BA.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13194
+                                     },
+                                     {
+                                         "ticker":  "BAC",
+                                         "url":  "/data/BAC.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13099
+                                     },
+                                     {
+                                         "ticker":  "BILL",
+                                         "url":  "/data/BILL.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13044
+                                     },
+                                     {
+                                         "ticker":  "BNTX",
+                                         "url":  "/data/BNTX.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  12967
+                                     },
+                                     {
+                                         "ticker":  "BRK.B",
+                                         "url":  "/data/BRK.B.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13334
+                                     },
+                                     {
+                                         "ticker":  "C",
+                                         "url":  "/data/C.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  12983
+                                     },
+                                     {
+                                         "ticker":  "CAT",
+                                         "url":  "/data/CAT.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13186
+                                     },
+                                     {
+                                         "ticker":  "CDNS",
+                                         "url":  "/data/CDNS.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13250
+                                     },
+                                     {
+                                         "ticker":  "CI",
+                                         "url":  "/data/CI.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13146
+                                     },
+                                     {
+                                         "ticker":  "COIN",
+                                         "url":  "/data/COIN.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13395
+                                     },
+                                     {
+                                         "ticker":  "COST",
+                                         "url":  "/data/COST.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13277
+                                     },
+                                     {
+                                         "ticker":  "CRM",
+                                         "url":  "/data/CRM.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13200
+                                     },
+                                     {
+                                         "ticker":  "CRWD",
+                                         "url":  "/data/CRWD.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13266
+                                     },
+                                     {
+                                         "ticker":  "CVS",
+                                         "url":  "/data/CVS.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13021
+                                     },
+                                     {
+                                         "ticker":  "CVX",
+                                         "url":  "/data/CVX.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13284
+                                     },
+                                     {
+                                         "ticker":  "DASH",
+                                         "url":  "/data/DASH.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13261
+                                     },
+                                     {
+                                         "ticker":  "DDOG",
+                                         "url":  "/data/DDOG.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13303
+                                     },
+                                     {
+                                         "ticker":  "DE",
+                                         "url":  "/data/DE.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13150
+                                     },
+                                     {
+                                         "ticker":  "DHR",
+                                         "url":  "/data/DHR.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13190
+                                     },
+                                     {
+                                         "ticker":  "DOCU",
+                                         "url":  "/data/DOCU.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13046
+                                     },
+                                     {
+                                         "ticker":  "ELV",
+                                         "url":  "/data/ELV.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13219
+                                     },
+                                     {
+                                         "ticker":  "ESTC",
+                                         "url":  "/data/ESTC.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13234
+                                     },
+                                     {
+                                         "ticker":  "FTNT",
+                                         "url":  "/data/FTNT.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13051
+                                     },
+                                     {
+                                         "ticker":  "GE",
+                                         "url":  "/data/GE.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13170
+                                     },
+                                     {
+                                         "ticker":  "GOOGL",
+                                         "url":  "/data/GOOGL.json",
+                                         "format":  "json",
+                                         "records":  201,
+                                         "firstDate":  "2024-09-24",
+                                         "lastDate":  "2025-09-19",
+                                         "sizeBytes":  42818
+                                     },
+                                     {
+                                         "ticker":  "GS",
+                                         "url":  "/data/GS.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13142
+                                     },
+                                     {
+                                         "ticker":  "HON",
+                                         "url":  "/data/HON.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13232
+                                     },
+                                     {
+                                         "ticker":  "HUM",
+                                         "url":  "/data/HUM.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13195
+                                     },
+                                     {
+                                         "ticker":  "IBM",
+                                         "url":  "/data/IBM.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13221
+                                     },
+                                     {
+                                         "ticker":  "IDXX",
+                                         "url":  "/data/IDXX.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13226
+                                     },
+                                     {
+                                         "ticker":  "INTC",
+                                         "url":  "/data/INTC.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13181
+                                     },
+                                     {
+                                         "ticker":  "INTU",
+                                         "url":  "/data/INTU.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13241
+                                     },
+                                     {
+                                         "ticker":  "ISRG",
+                                         "url":  "/data/ISRG.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13251
+                                     },
+                                     {
+                                         "ticker":  "JNJ",
+                                         "url":  "/data/JNJ.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13239
+                                     },
+                                     {
+                                         "ticker":  "JPM",
+                                         "url":  "/data/JPM.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13285
+                                     },
+                                     {
+                                         "ticker":  "KLAC",
+                                         "url":  "/data/KLAC.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13206
+                                     },
+                                     {
+                                         "ticker":  "KO",
+                                         "url":  "/data/KO.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13035
+                                     },
+                                     {
+                                         "ticker":  "LLY",
+                                         "url":  "/data/LLY.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13178
+                                     },
+                                     {
+                                         "ticker":  "LMT",
+                                         "url":  "/data/LMT.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13191
+                                     },
+                                     {
+                                         "ticker":  "LRCX",
+                                         "url":  "/data/LRCX.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13228
+                                     },
+                                     {
+                                         "ticker":  "LYFT",
+                                         "url":  "/data/LYFT.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13114
+                                     },
+                                     {
+                                         "ticker":  "MA",
+                                         "url":  "/data/MA.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13135
+                                     },
+                                     {
+                                         "ticker":  "MCK",
+                                         "url":  "/data/MCK.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13161
+                                     },
+                                     {
+                                         "ticker":  "MDB",
+                                         "url":  "/data/MDB.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13176
+                                     },
+                                     {
+                                         "ticker":  "META",
+                                         "url":  "/data/META.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13401
+                                     },
+                                     {
+                                         "ticker":  "MMM",
+                                         "url":  "/data/MMM.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13064
+                                     },
+                                     {
+                                         "ticker":  "MRK",
+                                         "url":  "/data/MRK.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13265
+                                     },
+                                     {
+                                         "ticker":  "MRNA",
+                                         "url":  "/data/MRNA.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13158
+                                     },
+                                     {
+                                         "ticker":  "MRVL",
+                                         "url":  "/data/MRVL.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13148
+                                     },
+                                     {
+                                         "ticker":  "MS",
+                                         "url":  "/data/MS.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  12959
+                                     },
+                                     {
+                                         "ticker":  "MSFT",
+                                         "url":  "/data/MSFT.json",
+                                         "format":  "json",
+                                         "records":  389,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2025-09-19",
+                                         "sizeBytes":  82332
+                                     },
+                                     {
+                                         "ticker":  "MU",
+                                         "url":  "/data/MU.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13083
+                                     },
+                                     {
+                                         "ticker":  "NET",
+                                         "url":  "/data/NET.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13006
+                                     },
+                                     {
+                                         "ticker":  "NFLX",
+                                         "url":  "/data/NFLX.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13298
+                                     },
+                                     {
+                                         "ticker":  "NOC",
+                                         "url":  "/data/NOC.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13132
+                                     },
+                                     {
+                                         "ticker":  "NOW",
+                                         "url":  "/data/NOW.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13147
+                                     },
+                                     {
+                                         "ticker":  "NVDA",
+                                         "url":  "/data/NVDA.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13361
+                                     },
+                                     {
+                                         "ticker":  "OKTA",
+                                         "url":  "/data/OKTA.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13121
+                                     },
+                                     {
+                                         "ticker":  "ON",
+                                         "url":  "/data/ON.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  12930
+                                     },
+                                     {
+                                         "ticker":  "ORCL",
+                                         "url":  "/data/ORCL.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13307
+                                     },
+                                     {
+                                         "ticker":  "PANW",
+                                         "url":  "/data/PANW.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13297
+                                     },
+                                     {
+                                         "ticker":  "PEP",
+                                         "url":  "/data/PEP.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13228
+                                     },
+                                     {
+                                         "ticker":  "PFE",
+                                         "url":  "/data/PFE.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13125
+                                     },
+                                     {
+                                         "ticker":  "PG",
+                                         "url":  "/data/PG.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13171
+                                     },
+                                     {
+                                         "ticker":  "PINS",
+                                         "url":  "/data/PINS.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13098
+                                     },
+                                     {
+                                         "ticker":  "PLTR",
+                                         "url":  "/data/PLTR.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13174
+                                     },
+                                     {
+                                         "ticker":  "PTON",
+                                         "url":  "/data/PTON.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  12857
+                                     },
+                                     {
+                                         "ticker":  "PYPL",
+                                         "url":  "/data/PYPL.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13169
+                                     },
+                                     {
+                                         "ticker":  "QCOM",
+                                         "url":  "/data/QCOM.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13324
+                                     },
+                                     {
+                                         "ticker":  "RBLX",
+                                         "url":  "/data/RBLX.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13091
+                                     },
+                                     {
+                                         "ticker":  "ROKU",
+                                         "url":  "/data/ROKU.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13052
+                                     },
+                                     {
+                                         "ticker":  "RTX",
+                                         "url":  "/data/RTX.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13025
+                                     },
+                                     {
+                                         "ticker":  "SHOP",
+                                         "url":  "/data/SHOP.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13064
+                                     },
+                                     {
+                                         "ticker":  "SNAP",
+                                         "url":  "/data/SNAP.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13121
+                                     },
+                                     {
+                                         "ticker":  "SNOW",
+                                         "url":  "/data/SNOW.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13264
+                                     },
+                                     {
+                                         "ticker":  "SNPS",
+                                         "url":  "/data/SNPS.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13205
+                                     },
+                                     {
+                                         "ticker":  "SPLK",
+                                         "url":  "/data/SPLK.json",
+                                         "format":  "json",
+                                         "records":  52,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-15",
+                                         "sizeBytes":  11312
+                                     },
+                                     {
+                                         "ticker":  "SPOT",
+                                         "url":  "/data/SPOT.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13256
+                                     },
+                                     {
+                                         "ticker":  "SQ",
+                                         "url":  "/data/SQ.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  12981
+                                     },
+                                     {
+                                         "ticker":  "TEAM",
+                                         "url":  "/data/TEAM.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13257
+                                     },
+                                     {
+                                         "ticker":  "TER",
+                                         "url":  "/data/TER.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13190
+                                     },
+                                     {
+                                         "ticker":  "TMO",
+                                         "url":  "/data/TMO.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13179
+                                     },
+                                     {
+                                         "ticker":  "TSLA",
+                                         "url":  "/data/TSLA.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13478
+                                     },
+                                     {
+                                         "ticker":  "TWLO",
+                                         "url":  "/data/TWLO.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13066
+                                     },
+                                     {
+                                         "ticker":  "TXN",
+                                         "url":  "/data/TXN.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13224
+                                     },
+                                     {
+                                         "ticker":  "UBER",
+                                         "url":  "/data/UBER.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13125
+                                     },
+                                     {
+                                         "ticker":  "UNH",
+                                         "url":  "/data/UNH.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13180
+                                     },
+                                     {
+                                         "ticker":  "UPS",
+                                         "url":  "/data/UPS.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13230
+                                     },
+                                     {
+                                         "ticker":  "V",
+                                         "url":  "/data/V.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13097
+                                     },
+                                     {
+                                         "ticker":  "VEEV",
+                                         "url":  "/data/VEEV.json",
+                                         "format":  "json",
+                                         "records":  61,
+                                         "firstDate":  "2024-01-02",
+                                         "lastDate":  "2024-03-28",
+                                         "sizeBytes":  13186
+                                     }
+                                 ]
+                 }
+}
