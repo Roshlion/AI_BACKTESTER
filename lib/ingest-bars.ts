@@ -59,10 +59,49 @@ export function sanitiseTickerForFile(ticker: string): string {
 
 export async function readTickerSeed(csvPath: string): Promise<string[]> {
   const content = await fs.readFile(csvPath, "utf8");
+// lib/ingest-bars.ts
+
+// ...above code unchanged...
+
   const lines = content
     .split(/\r?\n/)
-    .map((line) => line.trim())
+    .map((line: string) => line.trim())   // <— add : string here
     .filter(Boolean);
+
+  // If you have helpers in this file, give them explicit types too:
+  function parseCsvLine(line: string): string[] {
+    // (example only if you have such a util)
+    return line.split(",");
+  }
+
+  // And if you return arrays of a known shape, declare it:
+  type Bar = {
+    ticker: string;
+    date: string;       // or Date if you parse it
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume?: number;
+  };
+
+  // When you map lines to bars, type the accumulator/return:
+  const bars: Bar[] = lines.map((line: string) => {
+    const parts = line.split(",");
+    // build and return a Bar here...
+    return {
+      ticker: parts[0],
+      date: parts[1],
+      open: Number(parts[2]),
+      high: Number(parts[3]),
+      low: Number(parts[4]),
+      close: Number(parts[5]),
+      volume: parts[6] ? Number(parts[6]) : undefined,
+    };
+  });
+
+  // ...rest of file unchanged...
+
 
   if (!lines.length) return [];
 
