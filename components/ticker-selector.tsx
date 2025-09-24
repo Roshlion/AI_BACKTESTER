@@ -11,11 +11,20 @@ interface TickerInfo {
 }
 
 interface TickerSelectorProps {
-  onTickerSelect: (ticker: string) => void;
+  selectedTickers?: string[];
+  onTickersChange?: (tickers: string[]) => void;
   selectedTicker?: string;
+  onTickerSelect?: (ticker: string) => void;
+  multi?: boolean;
 }
 
-export function TickerSelector({ onTickerSelect, selectedTicker }: TickerSelectorProps) {
+export function TickerSelector({
+  onTickerSelect,
+  selectedTicker,
+  selectedTickers = [],
+  onTickersChange,
+  multi = false,
+}: TickerSelectorProps) {
   const [tickers, setTickers] = useState<TickerInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +56,28 @@ export function TickerSelector({ onTickerSelect, selectedTicker }: TickerSelecto
   const filteredTickers = tickers.filter(ticker =>
     ticker.ticker.toLowerCase().includes(search.toLowerCase())
   );
+
+  const toggleTicker = (tickerSymbol: string) => {
+    if (!multi) {
+      onTickerSelect?.(tickerSymbol);
+      return;
+    }
+
+    if (!onTickersChange) return;
+
+    const set = new Set(selectedTickers?.map((value) => value.toUpperCase()));
+    const normalized = tickerSymbol.toUpperCase();
+    if (set.has(normalized)) {
+      set.delete(normalized);
+    } else {
+      set.add(normalized);
+    }
+
+    const next = tickers
+      .map((item) => item.ticker.toUpperCase())
+      .filter((symbol) => set.has(symbol));
+    onTickersChange(next);
+  };
 
   if (loading) {
     return (
@@ -83,31 +114,72 @@ export function TickerSelector({ onTickerSelect, selectedTicker }: TickerSelecto
           <p className="text-gray-400">No tickers found</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {filteredTickers.map((ticker) => (
-              <button
-                key={ticker.ticker}
-                onClick={() => onTickerSelect(ticker.ticker)}
-                className={`w-full text-left px-3 py-3 sm:py-2 rounded transition-colors text-sm sm:text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                  selectedTicker === ticker.ticker
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{ticker.ticker}</span>
-                  {ticker.records && (
-                    <span className="text-xs sm:text-sm text-gray-400">
-                      {ticker.records.toLocaleString()} records
+            {filteredTickers.map((ticker) => {
+              const isSelected = multi
+                ? selectedTickers?.includes(ticker.ticker.toUpperCase())
+                : selectedTicker === ticker.ticker;
+
+              if (multi) {
+                return (
+                  <label
+                    key={ticker.ticker}
+                    className={`flex items-start gap-3 px-3 py-3 sm:py-2 rounded border transition-colors cursor-pointer text-sm sm:text-base focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 ${
+                      isSelected
+                        ? "bg-blue-900/40 border-blue-600 text-white"
+                        : "bg-gray-700/80 border-gray-600 text-gray-200 hover:bg-gray-600/80"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(isSelected)}
+                      onChange={() => toggleTicker(ticker.ticker)}
+                      className="mt-1 h-4 w-4 rounded border-gray-500 bg-gray-800 text-blue-500 focus:ring-blue-400"
+                    />
+                    <span className="flex-1">
+                      <span className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium tracking-wide">{ticker.ticker}</span>
+                        {ticker.records && (
+                          <span className="text-xs sm:text-sm text-gray-300">
+                            {ticker.records.toLocaleString()} records
+                          </span>
+                        )}
+                      </span>
+                      {ticker.lastDate && (
+                        <span className="block text-xs sm:text-sm text-gray-300 mt-1">
+                          Latest: {ticker.lastDate}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </div>
-                {ticker.lastDate && (
-                  <div className="text-xs sm:text-sm text-gray-400 mt-1">
-                    Latest: {ticker.lastDate}
+                  </label>
+                );
+              }
+
+              return (
+                <button
+                  key={ticker.ticker}
+                  onClick={() => toggleTicker(ticker.ticker)}
+                  className={`w-full text-left px-3 py-3 sm:py-2 rounded transition-colors text-sm sm:text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                    isSelected
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{ticker.ticker}</span>
+                    {ticker.records && (
+                      <span className="text-xs sm:text-sm text-gray-400">
+                        {ticker.records.toLocaleString()} records
+                      </span>
+                    )}
                   </div>
-                )}
-              </button>
-            ))}
+                  {ticker.lastDate && (
+                    <div className="text-xs sm:text-sm text-gray-400 mt-1">
+                      Latest: {ticker.lastDate}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
