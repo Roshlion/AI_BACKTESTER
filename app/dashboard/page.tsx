@@ -28,8 +28,10 @@ function DashboardInner() {
   const selectedTicker = selectedTickers[0] ?? "";
 
   useEffect(() => {
+    const hasTickersParam = searchParams.has("tickers");
+    const hasTickerParam = searchParams.has("ticker");
     const tickersParam =
-      searchParams.get("tickers") || searchParams.get("ticker") || "";
+      searchParams.get("tickers") ?? searchParams.get("ticker") ?? "";
     const parsedTickers = tickersParam
       .split(",")
       .map((value) => value.trim().toUpperCase())
@@ -39,7 +41,7 @@ function DashboardInner() {
       if (parsedTickers.join(",") !== selectedTickers.join(",")) {
         setSelectedTickers(parsedTickers);
       }
-    } else if (selectedTickers.length) {
+    } else if ((hasTickersParam || hasTickerParam) && selectedTickers.length) {
       setSelectedTickers([]);
     }
 
