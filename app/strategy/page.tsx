@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NotificationBar } from "@/components/notifications";
 import { getTickerMeta, intersectRange } from "@/lib/useDateLimits";
@@ -16,7 +16,7 @@ function parseTickers(input: string): string[] {
 const DEFAULT_PROMPT =
   "Design a swing trading strategy that uses SMA(20) crossovers with RSI confirmation and risk controls.";
 
-export default function StrategyPage() {
+function StrategyPageInner() {
   const [tickersInput, setTickersInput] = useState("AAPL, MSFT");
   const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
@@ -420,5 +420,13 @@ export default function StrategyPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function StrategyPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-gray-300">Loading…</div>}>
+      <StrategyPageInner />
+    </Suspense>
   );
 }
