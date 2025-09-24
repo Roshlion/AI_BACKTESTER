@@ -365,7 +365,9 @@ export function PriceChart({ tickers, dateRange, indicators }: PriceChartProps) 
                   formatter={(rawValue: number | string, name) => {
                     const value = Number(rawValue);
                     if (!Number.isFinite(value)) return ["—", name];
-                    if (name.includes("RSI")) return [value.toFixed(2), name];
+                    if (typeof name === "string" && name.includes("RSI")) {
+                      return [value.toFixed(2), name];
+                    }
                     return [`$${value.toFixed(2)}`, name];
                   }}
                 />
