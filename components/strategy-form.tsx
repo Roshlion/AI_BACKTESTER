@@ -53,7 +53,7 @@ export function StrategyForm({ onRunStrategy, loading }: StrategyFormProps) {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6">
+    <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-white mb-2">Strategy Builder</h2>
         <p className="text-gray-400">
@@ -65,11 +65,11 @@ export function StrategyForm({ onRunStrategy, loading }: StrategyFormProps) {
         {/* Mode Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-3">Strategy Type</label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setMode("dsl")}
-              className={`p-4 rounded-lg border text-left transition-colors ${
+              className={`p-4 rounded-lg border text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800 ${
                 mode === "dsl"
                   ? "border-blue-500 bg-blue-500/10 text-white"
                   : "border-gray-600 bg-gray-700 text-gray-300 hover:border-gray-500"
@@ -87,7 +87,7 @@ export function StrategyForm({ onRunStrategy, loading }: StrategyFormProps) {
             <button
               type="button"
               onClick={() => setMode("ml")}
-              className={`p-4 rounded-lg border text-left transition-colors ${
+              className={`p-4 rounded-lg border text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800 ${
                 mode === "ml"
                   ? "border-purple-500 bg-purple-500/10 text-white"
                   : "border-gray-600 bg-gray-700 text-gray-300 hover:border-gray-500"
@@ -127,7 +127,7 @@ export function StrategyForm({ onRunStrategy, loading }: StrategyFormProps) {
                   key={index}
                   type="button"
                   onClick={() => setPrompt(example)}
-                  className="block w-full text-left text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  className="block w-full text-left text-xs text-blue-400 hover:text-blue-300 transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
                 >
                   • {example}
                 </button>
@@ -137,7 +137,7 @@ export function StrategyForm({ onRunStrategy, loading }: StrategyFormProps) {
         </div>
 
         {/* Test Parameters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Tickers (comma-separated)
@@ -179,7 +179,7 @@ export function StrategyForm({ onRunStrategy, loading }: StrategyFormProps) {
         <button
           type="submit"
           disabled={loading || !prompt.trim()}
-          className="w-full flex items-center justify-center px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium rounded-lg transition-colors"
+          className="w-full flex items-center justify-center px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
         >
           {loading ? (
             <>
