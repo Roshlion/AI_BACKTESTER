@@ -2,20 +2,218 @@
 "use client";
 
 import { Suspense } from "react";
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { TickerSelector } from "@/components/ticker-selector";
 import { PriceChart } from "@/components/price-chart";
 import Link from "next/link";
+import { IndicatorToggles } from "@/components/IndicatorToggles";
+import { getTickerMeta, intersectRange } from "@/lib/useDateLimits";
+import { buildSamplePrompt } from "@/lib/samplePrompt";
 
 function DashboardInner() {
-  const [selectedTicker, setSelectedTicker] = useState<string>("");
+  const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
+  const [indicators, setIndicators] = useState({
+    rsi: false,
+    macd: false,
+    sma: true,
+    ema: false,
+  });
+  const [limits, setLimits] = useState<{ min?: string; max?: string }>({});
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const router = useRouter();
   const searchParams = useSearchParams();
 
+  const selectedTicker = selectedTickers[0] ?? "";
+
   useEffect(() => {
-    const t = searchParams.get("ticker");
-    if (t) setSelectedTicker(t.toUpperCase());
-  }, [searchParams]);
+    const tickersParam =
+      searchParams.get("tickers") || searchParams.get("ticker") || "";
+    const parsedTickers = tickersParam
+      .split(",")
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
+
+    if (parsedTickers.length) {
+      if (parsedTickers.join(",") !== selectedTickers.join(",")) {
+        setSelectedTickers(parsedTickers);
+      }
+    } else if (selectedTickers.length) {
+      setSelectedTickers([]);
+    }
+
+    const start = searchParams.get("start") || undefined;
+    const end = searchParams.get("end") || undefined;
+    setDateRange((prev) => {
+      if (prev.start === start && prev.end === end) return prev;
+      return { start, end };
+    });
+  }, [searchParams, selectedTickers]);
+
+  const selectedTickersKey = useMemo(() => selectedTickers.join(","), [selectedTickers]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (selectedTickers.length) {
+      params.set("tickers", selectedTickers.map((ticker) => ticker.toUpperCase()).join(","));
+    } else {
+      params.delete("tickers");
+      params.delete("ticker");
+    }
+
+    if (dateRange.start) {
+      params.set("start", dateRange.start);
+    } else {
+      params.delete("start");
+    }
+
+    if (dateRange.end) {
+      params.set("end", dateRange.end);
+    } else {
+      params.delete("end");
+    }
+
+    const next = params.toString();
+    if (next !== searchParams.toString()) {
+      router.replace(next ? `?${next}` : "?", { scroll: false });
+    }
+  }, [selectedTickersKey, dateRange.start, dateRange.end, router, searchParams]);
+
+  const updateTickerSelection = (tickers: string[]) => {
+    setSelectedTickers(tickers.map((ticker) => ticker.toUpperCase()));
+  };
+
+  const handlePrimaryTickerSelect = (ticker: string) => {
+    setSelectedTickers((prev) => {
+      const upper = ticker.toUpperCase();
+      if (!prev.length) return [upper];
+      const remaining = prev.filter((value) => value !== upper);
+      return [upper, ...remaining];
+    });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedTickers.length) {
+      setLimits({});
+      setLimitMessage(null);
+      return;
+    }
+
+    (async () => {
+      const meta = await getTickerMeta();
+      if (cancelled) return;
+
+      const nextLimits = intersectRange(selectedTickers, meta);
+      setLimits(nextLimits);
+
+      if (nextLimits.min && nextLimits.max && nextLimits.min > nextLimits.max) {
+        setLimitMessage("No overlapping date range for the selected tickers.");
+        if (dateRange.start || dateRange.end) {
+          setDateRange({});
+        }
+        return;
+      }
+
+      let start = dateRange.start;
+      let end = dateRange.end;
+      let clamped = false;
+
+      if (nextLimits.min && start && start < nextLimits.min) {
+        start = nextLimits.min;
+        clamped = true;
+      }
+      if (nextLimits.max && end && end > nextLimits.max) {
+        end = nextLimits.max;
+        clamped = true;
+      }
+      if (nextLimits.min && nextLimits.max && start && end && start > nextLimits.max) {
+        start = nextLimits.min;
+        end = nextLimits.max;
+        clamped = true;
+      }
+
+      if (start !== dateRange.start || end !== dateRange.end) {
+        setDateRange({ start, end });
+      }
+
+      if (clamped && (nextLimits.min || nextLimits.max)) {
+        const minLabel = nextLimits.min ?? "earliest";
+        const maxLabel = nextLimits.max ?? "latest";
+        setLimitMessage(`Dates limited to available range across selected tickers: ${minLabel} → ${maxLabel}.`);
+      } else {
+        setLimitMessage(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTickersKey]);
+
+  const limitValid = !limits.min || !limits.max || limits.min <= limits.max;
+
+  const handleStartChange = (value: string) => {
+    let next = value ? value : undefined;
+    if (next && limits.min && next < limits.min) {
+      next = limits.min;
+    }
+    if (limitValid && next && limits.max && next > limits.max) {
+      next = limits.max;
+    }
+
+    let end = dateRange.end;
+    if (next && end && end < next) {
+      end = next;
+    }
+    setDateRange({ start: next, end });
+  };
+
+  const handleEndChange = (value: string) => {
+    let next = value ? value : undefined;
+    if (limitValid && next && limits.max && next > limits.max) {
+      next = limits.max;
+    }
+    if (next && limits.min && next < limits.min) {
+      next = limits.min;
+    }
+
+    let start = dateRange.start;
+    if (start && next && start > next) {
+      start = next;
+    }
+    setDateRange({ start, end: next });
+  };
+
+  const handleNavigateToStrategy = () => {
+    if (!selectedTickers.length) return;
+    const params = new URLSearchParams();
+    const tickersParam = selectedTickers.join(",");
+    params.set("tickers", tickersParam);
+    params.set("prefill", "1");
+
+    const start = dateRange.start ?? limits.min;
+    const end = dateRange.end ?? limits.max;
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+
+    const activeIndicators = Object.entries(indicators)
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key);
+    if (activeIndicators.length) {
+      params.set("indicators", activeIndicators.join(","));
+    }
+
+    const promptSample = buildSamplePrompt(indicators, selectedTickers, start, end);
+    if (promptSample) {
+      params.set("prompt", promptSample);
+    }
+
+    router.push(`/strategy?${params.toString()}`);
+  };
 
   return (
     <Suspense fallback={<div className="p-6 text-gray-300">Loading…</div>}>
@@ -32,7 +230,10 @@ function DashboardInner() {
             {/* Ticker Selection Panel */}
             <div className="lg:col-span-1 order-2 lg:order-1">
               <TickerSelector
-                onTickerSelect={setSelectedTicker}
+                multi
+                selectedTickers={selectedTickers}
+                onTickersChange={updateTickerSelection}
+                onTickerSelect={handlePrimaryTickerSelect}
                 selectedTicker={selectedTicker}
               />
 
@@ -68,22 +269,66 @@ function DashboardInner() {
             </div>
 
             {/* Chart Panel */}
-            <div className="lg:col-span-2 order-1 lg:order-2">
-              {selectedTicker ? (
-                <PriceChart ticker={selectedTicker} />
-              ) : (
-                <div className="bg-gray-800 rounded-lg p-6 sm:p-8 text-center">
-                  <div className="text-gray-400 mb-4">
-                    <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a 2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
-                    Select a Ticker to View Chart
-                  </h3>
-                  <p className="text-sm sm:text-base text-gray-400">
-                    Choose a stock ticker from the list on the left to display its historical price data and interactive chart.
+            <div className="lg:col-span-2 order-1 lg:order-2 space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateRange.start ?? ""}
+                    min={limits.min}
+                    max={limitValid ? limits.max : undefined}
+                    onChange={(event) => handleStartChange(event.target.value)}
+                    className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateRange.end ?? ""}
+                    min={limits.min}
+                    max={limitValid ? limits.max : undefined}
+                    onChange={(event) => handleEndChange(event.target.value)}
+                    className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="sm:col-span-2 xl:col-span-1 flex items-end text-sm text-gray-400">
+                  Select one or more tickers to compare performance with optional indicator overlays.
+                </div>
+              </div>
+
+              {limitMessage && (
+                <div className="rounded-md border border-amber-600/30 bg-amber-900/10 px-4 py-2 text-xs text-amber-200">
+                  {limitMessage}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-4 lg:flex-row">
+                <div className="flex-1 min-w-0">
+                  <PriceChart tickers={selectedTickers} dateRange={dateRange} indicators={indicators} />
+                </div>
+                <div className="w-full lg:w-64">
+                  <IndicatorToggles value={indicators} onChange={setIndicators} />
+                </div>
+              </div>
+
+              {selectedTickers.length > 0 && (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-gray-400">
+                    Send these filters to Strategy Lab to auto-populate tickers, dates, and a suggested prompt.
                   </p>
+                  <button
+                    type="button"
+                    onClick={handleNavigateToStrategy}
+                    className="inline-flex items-center justify-center rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+                  >
+                    Test a strategy with these filters
+                  </button>
                 </div>
               )}
             </div>
