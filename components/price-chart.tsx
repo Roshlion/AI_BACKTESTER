@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PriceLineChart } from "./ui/chart";
 
 interface PriceData {
@@ -24,6 +24,8 @@ export function PriceChart({ ticker }: PriceChartProps) {
     start: "",
     end: ""
   });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [resizeKey, setResizeKey] = useState(0);
 
   useEffect(() => {
     if (!ticker) return;
@@ -56,16 +58,33 @@ export function PriceChart({ ticker }: PriceChartProps) {
     loadPriceData();
   }, [ticker, dateRange.start, dateRange.end]);
 
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      setResizeKey((prev) => prev + 1);
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   const latestPrice = data.length > 0 ? data[data.length - 1] : null;
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h3 className="text-lg font-semibold text-white">
           {ticker} Price Chart
         </h3>
         {latestPrice && (
-          <div className="text-right">
+          <div className="text-left sm:text-right">
             <div className="text-xl font-bold text-white">
               ${latestPrice.close.toFixed(2)}
             </div>
@@ -76,8 +95,8 @@ export function PriceChart({ ticker }: PriceChartProps) {
         )}
       </div>
 
-      <div className="flex gap-4 mb-4">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-4">
+        <div className="flex-1 sm:flex-none">
           <label className="block text-sm text-gray-400 mb-1">Start Date</label>
           <input
             type="date"
@@ -86,7 +105,7 @@ export function PriceChart({ ticker }: PriceChartProps) {
             className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
           />
         </div>
-        <div>
+        <div className="flex-1 sm:flex-none">
           <label className="block text-sm text-gray-400 mb-1">End Date</label>
           <input
             type="date"
@@ -99,22 +118,24 @@ export function PriceChart({ ticker }: PriceChartProps) {
 
       {loading && (
         <div className="h-64 flex items-center justify-center border rounded bg-gray-900">
-          <p className="text-gray-400">Loading chart data...</p>
+          <p className="text-sm sm:text-base text-gray-400">Loading chart data...</p>
         </div>
       )}
 
       {error && (
         <div className="h-64 flex items-center justify-center border rounded bg-red-900/20">
-          <p className="text-red-400">Error: {error}</p>
+          <p className="text-sm sm:text-base text-red-400">Error: {error}</p>
         </div>
       )}
 
       {!loading && !error && data.length > 0 && (
-        <>
-          <PriceLineChart data={data} />
+        <div className="w-full space-y-4">
+          <div className="w-full" ref={containerRef} style={{ aspectRatio: "16/9" }}>
+            <PriceLineChart key={resizeKey} data={data} />
+          </div>
 
           {latestPrice && (
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-700 rounded">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-gray-700 rounded">
               <div>
                 <div className="text-xs text-gray-400">Open</div>
                 <div className="text-white font-medium">${latestPrice.open.toFixed(2)}</div>
@@ -133,12 +154,12 @@ export function PriceChart({ ticker }: PriceChartProps) {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {!loading && !error && data.length === 0 && (
         <div className="h-64 flex items-center justify-center border rounded bg-gray-900">
-          <p className="text-gray-400">No data available for {ticker}</p>
+          <p className="text-sm sm:text-base text-gray-400">No data available for {ticker}</p>
         </div>
       )}
     </div>

@@ -93,24 +93,24 @@ export default function BacktesterPage() {
 
   return (
     <main className="min-h-screen bg-gray-900">
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+        <div className="mb-8 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3 text-sm sm:text-base">
               <Link
                 href="/dashboard"
-                className="flex items-center text-gray-400 hover:text-white transition-colors"
+                className="inline-flex items-center text-gray-400 hover:text-white transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
               >
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 Back to Dashboard
               </Link>
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
               <Link
                 href="/data"
-                className="flex items-center px-4 py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg transition-colors"
+                className="inline-flex items-center justify-center px-4 py-3 sm:py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
               >
                 <Database className="w-4 h-4 mr-2" />
                 Data Explorer
@@ -118,12 +118,12 @@ export default function BacktesterPage() {
             </div>
           </div>
 
-          <div className="mt-4">
-            <h1 className="text-3xl font-bold text-white mb-2">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">
               <Sparkles className="inline w-8 h-8 mr-2 text-blue-400" />
               AI Strategy Backtester
             </h1>
-            <p className="text-gray-400 text-lg">
+            <p className="mt-2 text-sm sm:text-base text-gray-400">
               Describe your trading strategy in plain English and let AI generate and test it for you
             </p>
           </div>
@@ -138,19 +138,19 @@ export default function BacktesterPage() {
         {error && (
           <div className="mb-8 p-4 bg-red-900/30 border border-red-500/50 rounded-lg">
             <h3 className="text-red-200 font-medium mb-2">Error</h3>
-            <p className="text-red-300">{error}</p>
+            <p className="text-sm sm:text-base text-red-300">{error}</p>
           </div>
         )}
 
         {/* Loading State */}
         {loading && (
-          <div className="mb-8 bg-gray-800 rounded-lg p-8 text-center">
+          <div className="mb-8 bg-gray-800 rounded-lg p-6 sm:p-8 text-center">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <h3 className="text-xl font-semibold text-white mb-2">Processing Strategy</h3>
-            <p className="text-gray-400">
+            <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Processing Strategy</h3>
+            <p className="text-sm sm:text-base text-gray-400">
               AI is generating your strategy and running the backtest...
             </p>
-            <div className="mt-4 space-y-2 text-sm text-gray-500">
+            <div className="mt-4 space-y-2 text-sm sm:text-base text-gray-500">
               <div>🤖 Analyzing your strategy description...</div>
               <div>⚡ Generating trading rules...</div>
               <div>📊 Running backtest simulation...</div>
@@ -166,16 +166,16 @@ export default function BacktesterPage() {
 
         {/* Help Section */}
         {!loading && !results && !error && (
-          <div className="mt-12 bg-gray-800 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">How It Works</h3>
+          <div className="mt-12 bg-gray-800 rounded-lg p-5 sm:p-6">
+            <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">How It Works</h3>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-blue-400 font-medium mb-2">Rule-Based Strategies (DSL)</h4>
-                <p className="text-gray-400 text-sm mb-3">
+                <p className="text-gray-400 text-sm sm:text-base mb-3">
                   Perfect for technical analysis strategies using indicators like moving averages, RSI, and MACD.
                 </p>
-                <ul className="text-gray-400 text-sm space-y-1">
+                <ul className="text-gray-400 text-sm sm:text-base space-y-1">
                   <li>• SMA/EMA crossover strategies</li>
                   <li>• RSI overbought/oversold levels</li>
                   <li>• MACD signal line crossovers</li>
@@ -185,10 +185,10 @@ export default function BacktesterPage() {
 
               <div>
                 <h4 className="text-purple-400 font-medium mb-2">Machine Learning Strategies</h4>
-                <p className="text-gray-400 text-sm mb-3">
+                <p className="text-gray-400 text-sm sm:text-base mb-3">
                   Advanced strategies using AI models to predict price movements and make trading decisions.
                 </p>
-                <ul className="text-gray-400 text-sm space-y-1">
+                <ul className="text-gray-400 text-sm sm:text-base space-y-1">
                   <li>• Random Forest classifiers</li>
                   <li>• Linear regression models</li>
                   <li>• Decision tree algorithms</li>
@@ -202,7 +202,7 @@ export default function BacktesterPage() {
 
             <div className="mt-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded">
               <h4 className="text-blue-300 font-medium mb-2">💡 Pro Tips</h4>
-              <ul className="text-blue-200 text-sm space-y-1">
+              <ul className="text-blue-200 text-sm sm:text-base space-y-1">
                 <li>• Be specific about entry and exit conditions</li>
                 <li>• Mention specific indicator periods (e.g., "10-day SMA")</li>
                 <li>• Test on multiple tickers to validate robustness</li>
