@@ -7,14 +7,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { TickerSelector } from "@/components/ticker-selector";
 import { PriceChart } from "@/components/price-chart";
 import Link from "next/link";
-import { IndicatorToggles } from "@/components/IndicatorToggles";
+import { IndicatorToggles, type IndicatorState } from "@/components/IndicatorToggles";
 import { getTickerMeta, intersectRange } from "@/lib/useDateLimits";
 import { buildSamplePrompt } from "@/lib/samplePrompt";
+
+const EMPTY_INDICATORS: IndicatorState = {
+  rsi: false,
+  macd: false,
+  sma: false,
+  ema: false,
+};
 
 function DashboardInner() {
   const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
-  const [indicators, setIndicators] = useState({
+  const [indicators, setIndicators] = useState<IndicatorState>({
     rsi: false,
     macd: false,
     sma: true,
@@ -22,10 +29,19 @@ function DashboardInner() {
   });
   const [limits, setLimits] = useState<{ min?: string; max?: string }>({});
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const [indicatorWarning, setIndicatorWarning] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const selectedTicker = selectedTickers[0] ?? "";
+  const indicatorLockReason =
+    selectedTickers.length > 1
+      ? "Indicators are available when exactly one ticker is selected."
+      : selectedTickers.length === 0
+        ? "Choose a ticker to enable indicator overlays."
+        : null;
+  const indicatorsLocked = Boolean(indicatorLockReason);
+  const effectiveIndicators = indicatorsLocked ? EMPTY_INDICATORS : indicators;
 
   useEffect(() => {
     const hasTickersParam = searchParams.has("tickers");
@@ -95,6 +111,12 @@ function DashboardInner() {
       return [upper, ...remaining];
     });
   };
+
+  useEffect(() => {
+    if (!indicatorsLocked) {
+      setIndicatorWarning(null);
+    }
+  }, [indicatorsLocked]);
 
   useEffect(() => {
     let cancelled = false;
@@ -202,14 +224,14 @@ function DashboardInner() {
     if (start) params.set("start", start);
     if (end) params.set("end", end);
 
-    const activeIndicators = Object.entries(indicators)
+    const activeIndicators = Object.entries(effectiveIndicators)
       .filter(([, enabled]) => enabled)
       .map(([key]) => key);
     if (activeIndicators.length) {
       params.set("indicators", activeIndicators.join(","));
     }
 
-    const promptSample = buildSamplePrompt(indicators, selectedTickers, start, end);
+    const promptSample = buildSamplePrompt(effectiveIndicators, selectedTickers, start, end);
     if (promptSample) {
       params.set("prompt", promptSample);
     }
@@ -312,10 +334,32 @@ function DashboardInner() {
 
               <div className="flex flex-col gap-4 lg:flex-row">
                 <div className="flex-1 min-w-0">
-                  <PriceChart tickers={selectedTickers} dateRange={dateRange} indicators={indicators} />
+                  <PriceChart tickers={selectedTickers} dateRange={dateRange} indicators={effectiveIndicators} />
                 </div>
-                <div className="w-full lg:w-64">
-                  <IndicatorToggles value={indicators} onChange={setIndicators} />
+                <div className="w-full lg:w-64 space-y-2">
+                  <IndicatorToggles
+                    value={indicatorsLocked ? EMPTY_INDICATORS : indicators}
+                    onChange={(next) => {
+                      if (indicatorsLocked) {
+                        setIndicatorWarning(indicatorLockReason);
+                        return;
+                      }
+                      setIndicatorWarning(null);
+                      setIndicators(next);
+                    }}
+                    disabled={indicatorsLocked}
+                    disabledReason={indicatorLockReason}
+                    onDisabledAttempt={() => {
+                      if (indicatorLockReason) {
+                        setIndicatorWarning(indicatorLockReason);
+                      }
+                    }}
+                  />
+                  {indicatorWarning && (
+                    <div className="rounded-md border border-red-700/40 bg-red-900/20 px-3 py-2 text-xs text-red-200">
+                      {indicatorWarning}
+                    </div>
+                  )}
                 </div>
               </div>
 

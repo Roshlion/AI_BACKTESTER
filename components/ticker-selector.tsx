@@ -67,15 +67,21 @@ export function TickerSelector({
 
     const set = new Set(selectedTickers?.map((value) => value.toUpperCase()));
     const normalized = tickerSymbol.toUpperCase();
-    if (set.has(normalized)) {
+    const wasSelected = set.has(normalized);
+
+    if (wasSelected) {
       set.delete(normalized);
     } else {
       set.add(normalized);
     }
 
-    const next = tickers
+    const ordered = tickers
       .map((item) => item.ticker.toUpperCase())
       .filter((symbol) => set.has(symbol));
+    const next = wasSelected
+      ? ordered
+      : [normalized, ...ordered.filter((symbol) => symbol !== normalized)];
+
     onTickersChange(next);
   };
 
@@ -121,36 +127,28 @@ export function TickerSelector({
 
               if (multi) {
                 return (
-                  <label
+                  <button
                     key={ticker.ticker}
-                    className={`flex items-start gap-3 px-3 py-3 sm:py-2 rounded border transition-colors cursor-pointer text-sm sm:text-base focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 ${
+                    type="button"
+                    onClick={() => toggleTicker(ticker.ticker)}
+                    className={`flex w-full items-center justify-between rounded-md border px-3 py-3 sm:py-2 text-left text-sm sm:text-base transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                       isSelected
-                        ? "bg-blue-900/40 border-blue-600 text-white"
-                        : "bg-gray-700/80 border-gray-600 text-gray-200 hover:bg-gray-600/80"
+                        ? "border-blue-500 bg-blue-600/30 text-white shadow-inner"
+                        : "border-gray-700 bg-gray-800/70 text-gray-200 hover:border-blue-400 hover:bg-gray-700/80 hover:text-white"
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(isSelected)}
-                      onChange={() => toggleTicker(ticker.ticker)}
-                      className="mt-1 h-4 w-4 rounded border-gray-500 bg-gray-800 text-blue-500 focus:ring-blue-400"
-                    />
-                    <span className="flex-1">
-                      <span className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium tracking-wide">{ticker.ticker}</span>
-                        {ticker.records && (
-                          <span className="text-xs sm:text-sm text-gray-300">
-                            {ticker.records.toLocaleString()} records
-                          </span>
-                        )}
-                      </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium tracking-wide">{ticker.ticker}</span>
                       {ticker.lastDate && (
-                        <span className="block text-xs sm:text-sm text-gray-300 mt-1">
-                          Latest: {ticker.lastDate}
-                        </span>
+                        <span className="text-xs sm:text-sm text-gray-300">Latest: {ticker.lastDate}</span>
                       )}
-                    </span>
-                  </label>
+                    </div>
+                    {ticker.records && (
+                      <span className="text-xs sm:text-sm text-gray-300">
+                        {ticker.records.toLocaleString()} records
+                      </span>
+                    )}
+                  </button>
                 );
               }
 

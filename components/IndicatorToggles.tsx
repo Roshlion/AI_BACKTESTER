@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 
-interface IndicatorState {
+export interface IndicatorState {
   rsi: boolean;
   macd: boolean;
   sma: boolean;
@@ -12,6 +12,9 @@ interface IndicatorState {
 interface IndicatorTogglesProps {
   value: IndicatorState;
   onChange: (value: IndicatorState) => void;
+  disabled?: boolean;
+  disabledReason?: string | null;
+  onDisabledAttempt?: () => void;
 }
 
 const INDICATOR_CONFIG: Array<{ key: keyof IndicatorState; label: string; description: string }> = [
@@ -21,8 +24,18 @@ const INDICATOR_CONFIG: Array<{ key: keyof IndicatorState; label: string; descri
   { key: "macd", label: "MACD", description: "Trend & momentum" },
 ];
 
-export function IndicatorToggles({ value, onChange }: IndicatorTogglesProps) {
+export function IndicatorToggles({
+  value,
+  onChange,
+  disabled = false,
+  disabledReason,
+  onDisabledAttempt,
+}: IndicatorTogglesProps) {
   const toggle = (key: keyof IndicatorState) => {
+    if (disabled) {
+      onDisabledAttempt?.();
+      return;
+    }
     onChange({ ...value, [key]: !value[key] });
   };
 
@@ -32,6 +45,11 @@ export function IndicatorToggles({ value, onChange }: IndicatorTogglesProps) {
       <p className="text-xs text-gray-400">
         Choose overlays and oscillators to display alongside price series.
       </p>
+      {disabledReason && (
+        <div className="rounded-md border border-amber-600/40 bg-amber-900/20 px-3 py-2 text-xs text-amber-200">
+          {disabledReason}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {INDICATOR_CONFIG.map((indicator) => {
           const active = value[indicator.key];
@@ -40,13 +58,17 @@ export function IndicatorToggles({ value, onChange }: IndicatorTogglesProps) {
               key={indicator.key}
               type="button"
               aria-pressed={active}
+              aria-disabled={disabled || undefined}
               onClick={() => toggle(indicator.key)}
               className={clsx(
                 "flex flex-col items-start gap-1 rounded-md border px-3 py-2 text-left transition",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900",
+                disabled
+                  ? "cursor-not-allowed border-gray-700 bg-gray-900/60 text-gray-500"
+                  : undefined,
                 active
                   ? "border-blue-500 bg-blue-600/30 text-white shadow-inner"
-                  : "border-gray-600 bg-gray-900/60 text-gray-200 hover:border-gray-500 hover:bg-gray-700/70"
+                  : "border-gray-600 bg-gray-900/60 text-gray-200 hover:border-gray-500 hover:bg-gray-700/70",
               )}
             >
               <span className="text-sm font-medium tracking-wide">{indicator.label}</span>
