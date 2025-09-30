@@ -68,15 +68,16 @@ function normalizePriceRows(rows: unknown): PriceRow[] {
       continue;
     }
 
-    normalized.push({
-      ...(record as PriceRow),
+    const normalizedRow: PriceRow = {
       date,
       open,
       high,
       low,
       close,
       volume: Number.isFinite(volumeValue) ? volumeValue : 0,
-    });
+    };
+
+    normalized.push(normalizedRow);
   }
 
   return normalized.sort((a, b) => a.date.localeCompare(b.date));
