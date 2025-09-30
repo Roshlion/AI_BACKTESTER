@@ -199,8 +199,14 @@ function DashboardInner() {
 
     const start = dateRange.start ?? limits.min;
     const end = dateRange.end ?? limits.max;
-    if (start) params.set("start", start);
-    if (end) params.set("end", end);
+    if (start) {
+      params.set("start", start);
+      params.set("startDate", start);
+    }
+    if (end) {
+      params.set("end", end);
+      params.set("endDate", end);
+    }
 
     const activeIndicators = Object.entries(indicators)
       .filter(([, enabled]) => enabled)
@@ -214,7 +220,8 @@ function DashboardInner() {
       params.set("prompt", promptSample);
     }
 
-    router.push(`/strategy?${params.toString()}`);
+    params.set("mode", "dsl");
+    router.push(`/backtester?${params.toString()}`);
   };
 
   return (
