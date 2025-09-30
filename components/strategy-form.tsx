@@ -1,15 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Sparkles, Code, BookOpen } from "lucide-react";
-
-export interface StrategyFormInitialValues {
-  prompt?: string;
-  mode?: "dsl" | "ml";
-  tickers?: string;
-  startDate?: string;
-  endDate?: string;
-}
+import { useState } from "react";
+import { Play, Sparkles, Code, BookOpen } from "lucide-react";
 
 interface StrategyFormProps {
   onRunStrategy: (params: {
@@ -20,45 +12,14 @@ interface StrategyFormProps {
     endDate: string;
   }) => void;
   loading: boolean;
-  initialValues?: StrategyFormInitialValues;
 }
 
-export function StrategyForm({ onRunStrategy, loading, initialValues }: StrategyFormProps) {
-  const [prompt, setPrompt] = useState(initialValues?.prompt ?? "");
-  const [mode, setMode] = useState<"dsl" | "ml">(initialValues?.mode ?? "dsl");
-  const [tickers, setTickers] = useState(initialValues?.tickers ?? "AAPL");
-  const [startDate, setStartDate] = useState(initialValues?.startDate ?? "2023-01-01");
-  const [endDate, setEndDate] = useState(initialValues?.endDate ?? "2024-01-01");
-
-  useEffect(() => {
-    if (initialValues?.prompt != null) {
-      setPrompt(initialValues.prompt);
-    }
-  }, [initialValues?.prompt]);
-
-  useEffect(() => {
-    if (initialValues?.mode) {
-      setMode(initialValues.mode);
-    }
-  }, [initialValues?.mode]);
-
-  useEffect(() => {
-    if (initialValues?.tickers != null) {
-      setTickers(initialValues.tickers);
-    }
-  }, [initialValues?.tickers]);
-
-  useEffect(() => {
-    if (initialValues?.startDate) {
-      setStartDate(initialValues.startDate);
-    }
-  }, [initialValues?.startDate]);
-
-  useEffect(() => {
-    if (initialValues?.endDate) {
-      setEndDate(initialValues.endDate);
-    }
-  }, [initialValues?.endDate]);
+export function StrategyForm({ onRunStrategy, loading }: StrategyFormProps) {
+  const [prompt, setPrompt] = useState("");
+  const [mode, setMode] = useState<"dsl" | "ml">("dsl");
+  const [tickers, setTickers] = useState("AAPL");
+  const [startDate, setStartDate] = useState("2023-01-01");
+  const [endDate, setEndDate] = useState("2024-01-01");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +53,7 @@ export function StrategyForm({ onRunStrategy, loading, initialValues }: Strategy
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+    <div className="bg-gray-800 rounded-lg p-6">
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-white mb-2">Strategy Builder</h2>
         <p className="text-gray-400">
@@ -104,11 +65,11 @@ export function StrategyForm({ onRunStrategy, loading, initialValues }: Strategy
         {/* Mode Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-3">Strategy Type</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setMode("dsl")}
-              className={`p-4 rounded-lg border text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800 ${
+              className={`p-4 rounded-lg border text-left transition-colors ${
                 mode === "dsl"
                   ? "border-blue-500 bg-blue-500/10 text-white"
                   : "border-gray-600 bg-gray-700 text-gray-300 hover:border-gray-500"
@@ -126,7 +87,7 @@ export function StrategyForm({ onRunStrategy, loading, initialValues }: Strategy
             <button
               type="button"
               onClick={() => setMode("ml")}
-              className={`p-4 rounded-lg border text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800 ${
+              className={`p-4 rounded-lg border text-left transition-colors ${
                 mode === "ml"
                   ? "border-purple-500 bg-purple-500/10 text-white"
                   : "border-gray-600 bg-gray-700 text-gray-300 hover:border-gray-500"
@@ -166,7 +127,7 @@ export function StrategyForm({ onRunStrategy, loading, initialValues }: Strategy
                   key={index}
                   type="button"
                   onClick={() => setPrompt(example)}
-                  className="block w-full text-left text-xs text-blue-400 hover:text-blue-300 transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+                  className="block w-full text-left text-xs text-blue-400 hover:text-blue-300 transition-colors"
                 >
                   • {example}
                 </button>
@@ -176,7 +137,7 @@ export function StrategyForm({ onRunStrategy, loading, initialValues }: Strategy
         </div>
 
         {/* Test Parameters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Tickers (comma-separated)
@@ -218,7 +179,7 @@ export function StrategyForm({ onRunStrategy, loading, initialValues }: Strategy
         <button
           type="submit"
           disabled={loading || !prompt.trim()}
-          className="w-full flex items-center justify-center px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+          className="w-full flex items-center justify-center px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium rounded-lg transition-colors"
         >
           {loading ? (
             <>

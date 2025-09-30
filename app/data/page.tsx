@@ -194,7 +194,7 @@ export default function DataExplorerPage() {
       <main className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm sm:text-base text-gray-400">Loading ticker data...</p>
+          <p className="text-gray-400">Loading ticker data...</p>
         </div>
       </main>
     );
@@ -204,10 +204,10 @@ export default function DataExplorerPage() {
     return (
       <main className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-sm sm:text-base text-red-400 mb-4">Error: {error}</p>
+          <p className="text-red-400 mb-4">Error: {error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-5 py-3 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
           >
             Retry
           </button>
@@ -218,24 +218,24 @@ export default function DataExplorerPage() {
 
   return (
     <main className="min-h-screen bg-gray-900">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="container mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-8 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3 text-sm sm:text-base">
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center text-gray-400 hover:text-white transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+                className="flex items-center text-gray-400 hover:text-white transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 Back to Dashboard
               </Link>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="flex space-x-3">
               <Link
                 href="/backtester"
-                className="inline-flex items-center justify-center px-4 py-3 sm:py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+                className="flex items-center px-4 py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg transition-colors"
               >
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Backtester
@@ -243,19 +243,19 @@ export default function DataExplorerPage() {
             </div>
           </div>
 
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">
+          <div className="mt-4">
+            <h1 className="text-3xl font-bold text-white mb-2">
               <Database className="inline w-8 h-8 mr-2 text-purple-400" />
               Data Explorer
             </h1>
-            <p className="mt-2 text-sm sm:text-base text-gray-400">
+            <p className="text-gray-400 text-lg">
               Explore available ticker datasets, metadata, and data coverage
             </p>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="flex items-center">
               <Database className="w-8 h-8 text-blue-400 mr-3" />
@@ -298,8 +298,8 @@ export default function DataExplorerPage() {
         </div>
 
         {/* Filters */}
-        <div className="bg-gray-800 rounded-lg p-5 sm:p-6 mb-8">
-          <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Filters & Search</h3>
+        <div className="bg-gray-800 rounded-lg p-6 mb-8">
+          <h3 className="text-lg font-semibold text-white mb-4">Filters & Search</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -340,9 +340,9 @@ export default function DataExplorerPage() {
               />
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+            <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Sort By</label>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex space-x-2">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
@@ -354,7 +354,7 @@ export default function DataExplorerPage() {
                 </select>
                 <button
                   onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                  className="px-3 py-3 sm:py-2 bg-gray-700 border border-gray-600 rounded text-white hover:bg-gray-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white hover:bg-gray-600 transition-colors"
                 >
                   {sortOrder === "asc" ? "↑" : "↓"}
                 </button>
@@ -366,12 +366,12 @@ export default function DataExplorerPage() {
         {/* Data Table */}
         <div className="bg-gray-800 rounded-lg overflow-hidden">
           <div className="p-4 border-b border-gray-700">
-            <h3 className="text-lg sm:text-xl font-semibold text-white">
+            <h3 className="text-lg font-semibold text-white">
               Ticker Catalog ({filteredTickers.length} items)
             </h3>
           </div>
 
-          <div className="overflow-x-auto scroll-container">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-700">
                 <tr>
@@ -381,21 +381,21 @@ export default function DataExplorerPage() {
                   >
                     Ticker {sortBy === "ticker" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
-                  <th className="text-left p-4 text-gray-300 hidden md:table-cell">Sector</th>
+                  <th className="text-left p-4 text-gray-300">Sector</th>
                   <th
                     className="text-right p-4 text-gray-300 cursor-pointer hover:text-white"
                     onClick={() => handleSort("records")}
                   >
                     Records {sortBy === "records" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
-                  <th className="text-left p-4 text-gray-300 hidden sm:table-cell">First Date</th>
+                  <th className="text-left p-4 text-gray-300">First Date</th>
                   <th
                     className="text-left p-4 text-gray-300 cursor-pointer hover:text-white"
                     onClick={() => handleSort("lastDate")}
                   >
                     Last Date {sortBy === "lastDate" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
-                  <th className="text-left p-4 text-gray-300 hidden lg:table-cell">Format</th>
+                  <th className="text-left p-4 text-gray-300">Format</th>
                   <th className="text-center p-4 text-gray-300">Actions</th>
                 </tr>
               </thead>
@@ -408,7 +408,7 @@ export default function DataExplorerPage() {
                         <div className="text-xs text-gray-400">{ticker.industry}</div>
                       )}
                     </td>
-                    <td className="p-4 hidden md:table-cell">
+                    <td className="p-4">
                       {ticker.sector ? (
                         <span className="inline-block px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded">
                           {ticker.sector}
@@ -420,9 +420,9 @@ export default function DataExplorerPage() {
                     <td className="p-4 text-right text-gray-300">
                       {ticker.records != null ? ticker.records.toLocaleString() : "-"}
                     </td>
-                    <td className="p-4 text-gray-300 hidden sm:table-cell">{ticker.firstDate ?? "-"}</td>
+                    <td className="p-4 text-gray-300">{ticker.firstDate ?? "-"}</td>
                     <td className="p-4 text-gray-300">{ticker.lastDate ?? "-"}</td>
-                    <td className="p-4 hidden lg:table-cell">
+                    <td className="p-4">
                       {ticker.format && (
                         <span className="inline-block px-2 py-1 bg-green-600/20 text-green-300 text-xs rounded uppercase">
                           {ticker.format}
@@ -433,7 +433,7 @@ export default function DataExplorerPage() {
                       <div className="flex space-x-2 justify-center">
                         <Link
                           href={{ pathname: "/dashboard", query: { ticker: ticker.ticker } }}
-                          className="inline-flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full text-blue-400 hover:text-blue-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+                          className="p-1 text-blue-400 hover:text-blue-300 transition-colors"
                           title="View Chart"
                         >
                           <Eye className="w-4 h-4" />
@@ -443,7 +443,7 @@ export default function DataExplorerPage() {
                             href={ticker.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full text-gray-400 hover:text-gray-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+                            className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
                             title="Download Data"
                           >
                             <Download className="w-4 h-4" />
@@ -457,7 +457,7 @@ export default function DataExplorerPage() {
             </table>
 
             {filteredTickers.length === 0 && (
-              <div className="p-8 text-center text-sm sm:text-base text-gray-400">
+              <div className="p-8 text-center text-gray-400">
                 No tickers match your current filters.
               </div>
             )}
@@ -467,14 +467,14 @@ export default function DataExplorerPage() {
         {/* Metadata */}
         {data?.asOf && (
           <div className="mt-8 p-4 bg-gray-800 rounded-lg border border-gray-700">
-            <div className="flex flex-col gap-4 text-sm sm:text-base md:flex-row md:items-center md:justify-between">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-4">
                 <div className="flex items-center">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                   <span className="text-gray-300">Data Source: {data.source || "S3"}</span>
                 </div>
               </div>
-              <div className="text-sm sm:text-base text-gray-400">
+              <div className="text-gray-400">
                 Last Updated: {new Date(data.asOf).toLocaleString()}
               </div>
             </div>

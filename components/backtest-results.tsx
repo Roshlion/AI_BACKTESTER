@@ -50,7 +50,7 @@ export function BacktestResults({ results, generatedStrategy }: BacktestResultsP
     <div className="space-y-6">
       {/* Generated Strategy Display */}
       {generatedStrategy && (
-        <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+        <div className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-white mb-4">
             Generated {generatedStrategy.mode === "dsl" ? "Strategy DSL" : "Python Code"}
           </h3>
@@ -76,10 +76,10 @@ export function BacktestResults({ results, generatedStrategy }: BacktestResultsP
       )}
 
       {/* Summary Stats */}
-      <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+      <div className="bg-gray-800 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-white mb-4">Backtest Summary</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div className="text-center p-4 bg-gray-700 rounded">
             <div className="text-2xl font-bold text-blue-400">{summary.processedTickers}</div>
             <div className="text-sm text-gray-400">Tickers Processed</div>
@@ -123,7 +123,7 @@ export function BacktestResults({ results, generatedStrategy }: BacktestResultsP
 
       {/* Per-Ticker Results */}
       {perTicker.map((result, index) => (
-        <div key={index} className="bg-gray-800 rounded-lg p-4 sm:p-6">
+        <div key={index} className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-white mb-4">
             {result.ticker} Results
           </h3>
@@ -131,7 +131,7 @@ export function BacktestResults({ results, generatedStrategy }: BacktestResultsP
           {result.mode === "dsl" && result.stats && (
             <>
               {/* DSL Results */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="flex items-center p-3 bg-gray-700 rounded">
                   <TrendingUp className="w-8 h-8 text-green-400 mr-3" />
                   <div>
