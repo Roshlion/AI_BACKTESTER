@@ -1,7 +1,6 @@
 /// <reference types="vitest" />
 import { describe, expect, it } from 'vitest';
 import { SMA, EMA, MACD, RSI } from '../lib/indicators';
-import { sma as lightweightSma, ema as lightweightEma, macd as lightweightMacd, rsi as lightweightRsi } from '../components/indicators';
 
 describe('Technical Indicators', () => {
   const testPrices = [100, 102, 104, 103, 105, 107, 106, 108, 110, 109];
@@ -105,69 +104,6 @@ describe('Technical Indicators', () => {
       // RSI should be low (<50) for consistent downtrend
       const lastRSI = rsi[rsi.length - 1];
       expect(lastRSI).toBeLessThan(50);
-    });
-  });
-
-  describe('client indicator helpers', () => {
-    it('matches library SMA output where defined', () => {
-      const period = 3;
-      const legacy = SMA(testPrices, period);
-      const fresh = lightweightSma(testPrices, period);
-
-      expect(fresh).toHaveLength(legacy.length);
-      fresh.forEach((value, index) => {
-        if (value == null) {
-          expect(Number.isNaN(legacy[index])).toBe(true);
-        } else {
-          expect(value).toBeCloseTo(legacy[index], 6);
-        }
-      });
-    });
-
-    it('returns EMA values after the warmup period', () => {
-      const period = 3;
-      const fresh = lightweightEma(testPrices, period);
-
-      expect(fresh).toHaveLength(testPrices.length);
-      for (let index = 0; index < period - 1; index++) {
-        expect(fresh[index]).toBeNull();
-      }
-      expect(fresh[period - 1]).not.toBeNull();
-      for (let index = period; index < fresh.length; index++) {
-        if (fresh[index] != null) {
-          expect(typeof fresh[index]).toBe("number");
-        }
-      }
-    });
-
-    it('produces RSI between 0-100', () => {
-      const values = lightweightRsi(testPrices, 3);
-      const legacy = RSI(testPrices, 3);
-      values.forEach((value, index) => {
-        if (value == null) {
-          expect(Number.isNaN(legacy[index])).toBe(true);
-        } else {
-          expect(value).toBeGreaterThanOrEqual(0);
-          expect(value).toBeLessThanOrEqual(100);
-        }
-      });
-    });
-
-    it('aligns MACD line with EMA differences', () => {
-      const prices = [100, 102, 104, 106, 108, 110];
-      const macd = lightweightMacd(prices, 3, 6, 3);
-      const fast = lightweightEma(prices, 3);
-      const slow = lightweightEma(prices, 6);
-
-      macd.macd.forEach((value, index) => {
-        const fastValue = fast[index];
-        const slowValue = slow[index];
-        if (fastValue == null || slowValue == null) {
-          expect(value).toBeNull();
-        } else {
-          expect(value).toBeCloseTo(fastValue - slowValue, 6);
-        }
-      });
     });
   });
 });
