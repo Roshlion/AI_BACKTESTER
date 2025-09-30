@@ -34,6 +34,54 @@ interface ChartPoint {
   [key: string]: string | number | null | undefined;
 }
 
+type DerivedState = {
+  pricePoints: ChartPoint[];
+  rsiPoints: ChartPoint[];
+  macdPoints: ChartPoint[];
+  tickerSummaries: Array<{
+    ticker: string;
+    latestClose?: number;
+    latestDate?: string;
+    firstDate?: string;
+    changePct?: number;
+    hasData: boolean;
+  }>;
+  missingTickers: string[];
+  buildError: string | null;
+};
+
+function normalizePriceRows(rows: unknown): PriceRow[] {
+  if (!Array.isArray(rows)) return [];
+  const normalized: PriceRow[] = [];
+
+  for (const raw of rows) {
+    if (!raw) continue;
+    const record = raw as Record<string, unknown>;
+    const date = typeof record.date === "string" ? record.date : undefined;
+    const open = Number(record.open);
+    const high = Number(record.high);
+    const low = Number(record.low);
+    const close = Number(record.close);
+    const volumeValue = Number(record.volume);
+
+    if (!date || !Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) {
+      continue;
+    }
+
+    normalized.push({
+      ...(record as PriceRow),
+      date,
+      open,
+      high,
+      low,
+      close,
+      volume: Number.isFinite(volumeValue) ? volumeValue : 0,
+    });
+  }
+
+  return normalized.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 const SERIES_COLORS = [
   "#60A5FA",
   "#F97316",
@@ -106,7 +154,7 @@ export function PriceChart({ tickers, dateRange, indicators }: PriceChartProps) 
           if (!json.ok || !Array.isArray(json.rows)) {
             throw new Error(json.error || "Failed to load data");
           }
-          setSeriesMap({ [ticker]: json.rows as PriceRow[] });
+          setSeriesMap({ [ticker]: normalizePriceRows(json.rows) });
           return;
         }
 
@@ -127,9 +175,12 @@ export function PriceChart({ tickers, dateRange, indicators }: PriceChartProps) 
         const mapped: Record<string, PriceRow[]> = {};
         for (const item of json.data) {
           if (!item || typeof item.ticker !== "string") continue;
-          mapped[item.ticker.toUpperCase()] = Array.isArray(item.bars)
-            ? (item.bars as PriceRow[])
-            : [];
+          mapped[item.ticker.toUpperCase()] = normalizePriceRows(item.bars);
+        }
+        for (const ticker of normalizedTickers) {
+          if (!mapped[ticker]) {
+            mapped[ticker] = [];
+          }
         }
         setSeriesMap(mapped);
       } catch (err) {
@@ -148,123 +199,143 @@ export function PriceChart({ tickers, dateRange, indicators }: PriceChartProps) 
     return () => controller.abort();
   }, [normalizedTickers, dateRange?.start, dateRange?.end]);
 
-  const derived = useMemo(() => {
-    const pricePoints: ChartPoint[] = [];
-    const rsiPoints: ChartPoint[] = [];
-    const macdPoints: ChartPoint[] = [];
-    const tickerSummaries: Array<{
-      ticker: string;
-      latestClose?: number;
-      latestDate?: string;
-      firstDate?: string;
-      changePct?: number;
-      hasData: boolean;
-    }> = [];
-    const missingTickers: string[] = [];
+  const derived = useMemo<DerivedState>(() => {
+    try {
+      const pricePoints: ChartPoint[] = [];
+      const rsiPoints: ChartPoint[] = [];
+      const macdPoints: ChartPoint[] = [];
+      const tickerSummaries: DerivedState["tickerSummaries"] = [];
+      const missingTickers: string[] = [];
 
-    if (!normalizedTickers.length) {
-      return { pricePoints, rsiPoints, macdPoints, tickerSummaries, missingTickers };
-    }
-
-    const allDates = new Set<string>();
-    for (const ticker of normalizedTickers) {
-      const rows = seriesMap[ticker];
-      if (!rows || rows.length === 0) {
-        tickerSummaries.push({ ticker, hasData: false });
-        missingTickers.push(ticker);
-        continue;
+      if (!normalizedTickers.length) {
+        return {
+          pricePoints,
+          rsiPoints,
+          macdPoints,
+          tickerSummaries,
+          missingTickers,
+          buildError: null,
+        };
       }
-      rows.forEach((row) => allDates.add(row.date));
-    }
 
-    const sortedDates = Array.from(allDates).sort();
-    pricePoints.push(...sortedDates.map((date) => ({ date })));
-    if (indicatorState.rsi) {
-      rsiPoints.push(...sortedDates.map((date) => ({ date })));
-    }
-    if (indicatorState.macd) {
-      macdPoints.push(...sortedDates.map((date) => ({ date })));
-    }
-
-    const priceLookup = new Map(pricePoints.map((point) => [point.date, point]));
-    const rsiLookup = new Map(rsiPoints.map((point) => [point.date, point]));
-    const macdLookup = new Map(macdPoints.map((point) => [point.date, point]));
-
-    for (const ticker of normalizedTickers) {
-      const rows = seriesMap[ticker];
-      if (!rows || rows.length === 0) continue;
-
-      const closes = rows.map((row) => row.close ?? NaN);
-      const smaValues = indicatorState.sma ? sma(closes, 20) : [];
-      const emaValues = indicatorState.ema ? ema(closes, 50) : [];
-      const rsiValues = indicatorState.rsi ? rsi(closes) : [];
-      const macdValues = indicatorState.macd ? macd(closes) : undefined;
-
-      const firstRow = rows[0];
-      const lastRow = rows[rows.length - 1];
-      const changePct =
-        firstRow && lastRow && Number.isFinite(firstRow.close) && firstRow.close !== 0
-          ? ((lastRow.close - firstRow.close) / firstRow.close) * 100
-          : undefined;
-      tickerSummaries.push({
-        ticker,
-        firstDate: firstRow?.date,
-        latestClose: lastRow?.close,
-        latestDate: lastRow?.date,
-        changePct,
-        hasData: true,
-      });
-
-      rows.forEach((row, index) => {
-        const base = priceLookup.get(row.date);
-        if (base) {
-          base[ticker] = row.close ?? null;
-          if (indicatorState.sma && smaValues[index] != null) {
-            base[`${ticker}_SMA20`] = smaValues[index];
-          }
-          if (indicatorState.ema && emaValues[index] != null) {
-            base[`${ticker}_EMA50`] = emaValues[index];
-          }
+      const allDates = new Set<string>();
+      for (const ticker of normalizedTickers) {
+        const rows = seriesMap[ticker];
+        if (!rows || rows.length === 0) {
+          tickerSummaries.push({ ticker, hasData: false });
+          missingTickers.push(ticker);
+          continue;
         }
-        if (indicatorState.rsi && rsiValues[index] != null) {
-          const target = rsiLookup.get(row.date);
-          if (target) {
-            target[`${ticker}_RSI`] = rsiValues[index];
+        rows.forEach((row) => {
+          if (row?.date) {
+            allDates.add(row.date);
           }
-        }
-        if (indicatorState.macd && macdValues) {
-          const macdPoint = macdLookup.get(row.date);
-          if (macdPoint) {
-            const macdValue = macdValues.macd[index];
-            const signalValue = macdValues.signal[index];
-            if (macdValue != null) macdPoint[`${ticker}_MACD`] = macdValue;
-            if (signalValue != null) macdPoint[`${ticker}_SIGNAL`] = signalValue;
+        });
+      }
+
+      const sortedDates = Array.from(allDates).sort();
+      pricePoints.push(...sortedDates.map((date) => ({ date })));
+      if (indicatorState.rsi) {
+        rsiPoints.push(...sortedDates.map((date) => ({ date })));
+      }
+      if (indicatorState.macd) {
+        macdPoints.push(...sortedDates.map((date) => ({ date })));
+      }
+
+      const priceLookup = new Map(pricePoints.map((point) => [point.date, point]));
+      const rsiLookup = new Map(rsiPoints.map((point) => [point.date, point]));
+      const macdLookup = new Map(macdPoints.map((point) => [point.date, point]));
+
+      for (const ticker of normalizedTickers) {
+        const rows = seriesMap[ticker];
+        if (!rows || rows.length === 0) continue;
+
+        const closes = rows.map((row) => (Number.isFinite(row.close) ? row.close : NaN));
+        const smaValues = indicatorState.sma ? sma(closes, 20) : [];
+        const emaValues = indicatorState.ema ? ema(closes, 50) : [];
+        const rsiValues = indicatorState.rsi ? rsi(closes) : [];
+        const macdValues = indicatorState.macd ? macd(closes) : undefined;
+
+        const firstRow = rows[0];
+        const lastRow = rows[rows.length - 1];
+        const changePct =
+          firstRow && lastRow && Number.isFinite(firstRow.close) && firstRow.close !== 0
+            ? ((lastRow.close - firstRow.close) / firstRow.close) * 100
+            : undefined;
+        tickerSummaries.push({
+          ticker,
+          firstDate: firstRow?.date,
+          latestClose: lastRow?.close,
+          latestDate: lastRow?.date,
+          changePct,
+          hasData: true,
+        });
+
+        rows.forEach((row, index) => {
+          const base = priceLookup.get(row.date);
+          if (base) {
+            base[ticker] = Number.isFinite(row.close) ? row.close : null;
+            if (indicatorState.sma && smaValues[index] != null) {
+              base[`${ticker}_SMA20`] = smaValues[index];
+            }
+            if (indicatorState.ema && emaValues[index] != null) {
+              base[`${ticker}_EMA50`] = emaValues[index];
+            }
           }
-        }
-      });
+          if (indicatorState.rsi && rsiValues[index] != null) {
+            const target = rsiLookup.get(row.date);
+            if (target) {
+              target[`${ticker}_RSI`] = rsiValues[index];
+            }
+          }
+          if (indicatorState.macd && macdValues) {
+            const macdPoint = macdLookup.get(row.date);
+            if (macdPoint) {
+              const macdValue = macdValues.macd[index];
+              const signalValue = macdValues.signal[index];
+              if (macdValue != null) macdPoint[`${ticker}_MACD`] = macdValue;
+              if (signalValue != null) macdPoint[`${ticker}_SIGNAL`] = signalValue;
+            }
+          }
+        });
+      }
+
+      const hasRsi = indicatorState.rsi
+        ? rsiPoints.some((point) =>
+            normalizedTickers.some((ticker) => point[`${ticker}_RSI`] != null),
+          )
+        : false;
+      const hasMacd = indicatorState.macd
+        ? macdPoints.some((point) =>
+            normalizedTickers.some(
+              (ticker) =>
+                point[`${ticker}_MACD`] != null || point[`${ticker}_SIGNAL`] != null,
+            ),
+          )
+        : false;
+
+      return {
+        pricePoints,
+        rsiPoints: hasRsi ? rsiPoints : [],
+        macdPoints: hasMacd ? macdPoints : [],
+        tickerSummaries,
+        missingTickers,
+        buildError: null,
+      };
+    } catch (err) {
+      console.error("Failed to derive chart data", err);
+      return {
+        pricePoints: [],
+        rsiPoints: [],
+        macdPoints: [],
+        tickerSummaries: normalizedTickers.map((ticker) => ({ ticker, hasData: false })),
+        missingTickers: normalizedTickers,
+        buildError:
+          err instanceof Error
+            ? err.message
+            : "Unknown error while building chart data.",
+      };
     }
-
-    const hasRsi = indicatorState.rsi
-      ? rsiPoints.some((point) =>
-          normalizedTickers.some((ticker) => point[`${ticker}_RSI`] != null),
-        )
-      : false;
-    const hasMacd = indicatorState.macd
-      ? macdPoints.some((point) =>
-          normalizedTickers.some(
-            (ticker) =>
-              point[`${ticker}_MACD`] != null || point[`${ticker}_SIGNAL`] != null,
-          ),
-        )
-      : false;
-
-    return {
-      pricePoints,
-      rsiPoints: hasRsi ? rsiPoints : [],
-      macdPoints: hasMacd ? macdPoints : [],
-      tickerSummaries,
-      missingTickers,
-    };
   }, [seriesMap, normalizedTickers, indicatorState]);
 
   if (!normalizedTickers.length) {
@@ -296,7 +367,12 @@ export function PriceChart({ tickers, dateRange, indicators }: PriceChartProps) 
     return accumulator;
   }, {});
 
-  const hasPriceData = derived.pricePoints.length > 0;
+  const hasPriceData = derived.pricePoints.some((point) =>
+    normalizedTickers.some((ticker) => {
+      const value = point[ticker];
+      return typeof value === "number" && Number.isFinite(value);
+    }),
+  );
 
   return (
     <div className="space-y-6 rounded-lg border border-gray-700 bg-gray-800 p-4 sm:p-6">
@@ -339,6 +415,12 @@ export function PriceChart({ tickers, dateRange, indicators }: PriceChartProps) 
           </div>
         ))}
       </div>
+
+      {derived.buildError && (
+        <div className="rounded-md border border-red-700/50 bg-red-900/20 p-3 text-xs text-red-200">
+          Unable to render the full chart for the selected tickers. {derived.buildError}
+        </div>
+      )}
 
       {derived.missingTickers.length > 0 && (
         <div className="rounded-md border border-amber-600/40 bg-amber-900/20 p-3 text-xs text-amber-200">

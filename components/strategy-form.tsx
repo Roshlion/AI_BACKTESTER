@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Play, Sparkles, Code, BookOpen } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Sparkles, Code, BookOpen } from "lucide-react";
+
+export interface StrategyFormInitialValues {
+  prompt?: string;
+  mode?: "dsl" | "ml";
+  tickers?: string;
+  startDate?: string;
+  endDate?: string;
+}
 
 interface StrategyFormProps {
   onRunStrategy: (params: {
@@ -12,14 +20,45 @@ interface StrategyFormProps {
     endDate: string;
   }) => void;
   loading: boolean;
+  initialValues?: StrategyFormInitialValues;
 }
 
-export function StrategyForm({ onRunStrategy, loading }: StrategyFormProps) {
-  const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState<"dsl" | "ml">("dsl");
-  const [tickers, setTickers] = useState("AAPL");
-  const [startDate, setStartDate] = useState("2023-01-01");
-  const [endDate, setEndDate] = useState("2024-01-01");
+export function StrategyForm({ onRunStrategy, loading, initialValues }: StrategyFormProps) {
+  const [prompt, setPrompt] = useState(initialValues?.prompt ?? "");
+  const [mode, setMode] = useState<"dsl" | "ml">(initialValues?.mode ?? "dsl");
+  const [tickers, setTickers] = useState(initialValues?.tickers ?? "AAPL");
+  const [startDate, setStartDate] = useState(initialValues?.startDate ?? "2023-01-01");
+  const [endDate, setEndDate] = useState(initialValues?.endDate ?? "2024-01-01");
+
+  useEffect(() => {
+    if (initialValues?.prompt != null) {
+      setPrompt(initialValues.prompt);
+    }
+  }, [initialValues?.prompt]);
+
+  useEffect(() => {
+    if (initialValues?.mode) {
+      setMode(initialValues.mode);
+    }
+  }, [initialValues?.mode]);
+
+  useEffect(() => {
+    if (initialValues?.tickers != null) {
+      setTickers(initialValues.tickers);
+    }
+  }, [initialValues?.tickers]);
+
+  useEffect(() => {
+    if (initialValues?.startDate) {
+      setStartDate(initialValues.startDate);
+    }
+  }, [initialValues?.startDate]);
+
+  useEffect(() => {
+    if (initialValues?.endDate) {
+      setEndDate(initialValues.endDate);
+    }
+  }, [initialValues?.endDate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

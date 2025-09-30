@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { StrategyForm } from "@/components/strategy-form";
+import { useEffect, useMemo, useState } from "react";
+import { StrategyForm, StrategyFormInitialValues } from "@/components/strategy-form";
 import { BacktestResults } from "@/components/backtest-results";
 import { Database, Sparkles, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 interface BacktestResult {
   ok: boolean;
@@ -24,6 +25,65 @@ export default function BacktesterPage() {
   const [results, setResults] = useState<BacktestResult | null>(null);
   const [generatedStrategy, setGeneratedStrategy] = useState<GeneratedStrategy | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const paramsKey = searchParams?.toString();
+
+  const prefillValues = useMemo<StrategyFormInitialValues | null>(() => {
+    if (!paramsKey) return null;
+    const params = new URLSearchParams(paramsKey);
+    if (params.get("prefill") !== "1") return null;
+
+    const values: StrategyFormInitialValues = {};
+    let hasAny = false;
+
+    const tickersParam = params.get("tickers") ?? params.get("ticker") ?? "";
+    if (tickersParam) {
+      const normalizedTickers = tickersParam
+        .split(/[\s,]+/)
+        .map((value) => value.trim().toUpperCase())
+        .filter(Boolean);
+      if (normalizedTickers.length) {
+        values.tickers = normalizedTickers.join(", ");
+        hasAny = true;
+      }
+    }
+
+    const startParam = params.get("startDate") ?? params.get("start") ?? "";
+    if (startParam) {
+      values.startDate = startParam;
+      hasAny = true;
+    }
+
+    const endParam = params.get("endDate") ?? params.get("end") ?? "";
+    if (endParam) {
+      values.endDate = endParam;
+      hasAny = true;
+    }
+
+    const promptParam = params.get("prompt");
+    if (promptParam) {
+      values.prompt = promptParam;
+      hasAny = true;
+    }
+
+    const modeParam = params.get("mode");
+    if (modeParam === "dsl" || modeParam === "ml") {
+      values.mode = modeParam;
+      hasAny = true;
+    }
+
+    return hasAny ? values : {};
+  }, [paramsKey]);
+
+  const hasPrefill = prefillValues != null && Object.keys(prefillValues).length > 0;
+
+  useEffect(() => {
+    if (!prefillValues) return;
+    setError(null);
+    setResults(null);
+    setGeneratedStrategy(null);
+  }, [prefillValues]);
 
   const handleRunStrategy = async (params: {
     prompt: string;
@@ -130,8 +190,17 @@ export default function BacktesterPage() {
         </div>
 
         {/* Strategy Form */}
-        <div className="mb-8">
-          <StrategyForm onRunStrategy={handleRunStrategy} loading={loading} />
+        <div className="mb-8 space-y-4">
+          {hasPrefill && (
+            <div className="rounded-md border border-blue-600/40 bg-blue-900/20 px-4 py-3 text-sm text-blue-200">
+              Strategy Lab has been pre-filled with your dashboard selections.
+            </div>
+          )}
+          <StrategyForm
+            onRunStrategy={handleRunStrategy}
+            loading={loading}
+            initialValues={prefillValues ?? undefined}
+          />
         </div>
 
         {/* Error Display */}
