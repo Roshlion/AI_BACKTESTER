@@ -14,7 +14,8 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 - S3-first data access: reads Parquet/CSV over HTTPS from `s3://<bucket>/<prefix>/` (no local fs)
 - Manifest-driven: `index.json` in S3 lists tickers & metadata for Dashboard/Data Explorer
 - AI backtester: `/api/strategy/generate` converts prompts to DSL; `/api/strategy/run` executes it
-- Charts & UI: Recharts + Tailwind. Pages for Dashboard, Backtester, Data Explorer
+- Dashboard comparisons: select multiple tickers, overlay SMA/EMA/RSI/MACD (adjustable windows), auto-fit date ranges, and launch the Strategy Lab with one click
+- Charts & UI: Recharts + Tailwind with multi-ticker overlays, indicator toggles, and quick hand-offs to the Strategy Lab
 - Tests: Vitest unit tests for normalizers/engine helpers
 
 ## Architecture
@@ -35,8 +36,8 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 ## Repository Layout
 
 - `app/`
-    - `dashboard/` — Dashboard UI: ticker list, chart
-    - `strategy/` — AI backtester interface (prompt → DSL → run)
+    - `dashboard/` — Dashboard UI: multi-select tickers, indicator overlays, strategy shortcut
+    - `strategy/` — AI backtester interface (DSL editor, prefilled via dashboard shortcut)
     - `api/` — Next.js API routes (Node runtime)
 - `lib/`
     - `env.ts` — environment helpers
@@ -114,6 +115,7 @@ Keep `.env.local` as the source of truth locally; replicate these in Vercel → 
 
 - Open `/backtester`, enter a prompt like:
     - “EMA 12/26 long on cross up; exit on cross down”
+- Or jump from the dashboard via **Create a strategy with this** to pre-fill tickers/indicators.
 - Choose one or more tickers, pick a date range, and run.
 - You’ll see equity curve, trades, and summary stats.
 
