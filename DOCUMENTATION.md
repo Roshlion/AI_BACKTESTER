@@ -17,9 +17,9 @@ Polygon is optional (for periodic refresh); day-to-day operation uses S3 data on
 
 Flow:
 
-- S3 (Parquet + `index.json`)  
-  → Next.js 14 API routes (Node runtime)  
-  → UI pages (Dashboard, Backtester, Data Explorer)
+- S3 (Parquet + `index.json`)
+  → Next.js 14 API routes (Node runtime)
+  → UI pages (Dashboard, Strategy Lab, Data Warehouse)
 
 Key invariants:
 
@@ -121,17 +121,23 @@ Execution (per ticker):
 ## 6. Frontend Pages
 
 - `/dashboard`
-    - Loads `/api/index`, shows ticker count and quick info
-    - Selecting a ticker loads `/api/local-data` and renders a price chart + small stats
+    - Loads `/api/index` and renders a searchable, scrollable ticker list
+    - Multi-select with full-row highlight, isolate icon, and eye link to the Data Warehouse
+    - Indicator controls: SMA/EMA (double-click to edit period), RSI, MACD; auto-computed date ranges with reset
+    - Chart scale modes: absolute price, indexed %, and small multiples; legend click hides/show, hover emphasises series
+    - Downsamples timelines >5k points per view and surfaces a non-blocking message when a ticker has no data in the selected range
+    - “Create a strategy with this” pushes selections into the Strategy Lab via shared store and navigates to `/strategy`
 
-- `/backtester`
-    - Textarea for prompt → `/api/strategy/generate` → DSL JSON
-    - Allows manual DSL editing
-    - Runs `/api/strategy/run`, shows equity curve, trades, metrics
+- `/strategy`
+    - Server component reads `searchParams` (tickers, indicators, start, end) and passes props to the client Strategy Lab
+    - Client component also reads from global store when query params are absent
+    - Sector multi-select appears when `public/sectors.json` (or manifest metadata) provides mappings; selecting sectors unions tickers, deselecting removes non-manual ones
+    - Prompt textarea prefilled from indicator tokens; generate DSL via `/api/strategy/generate` then execute via `/api/strategy/run`
+    - Results reused from legacy Backtester (equity curves, trades, metrics)
 
-- `/data-explorer`
-    - Lists all tickers from manifest
-    - Optional filters (sector/industry) if present in manifest metadata
+- `/explore`
+    - Data Warehouse index: searchable list of manifest tickers with single-ticker chart and stats
+    - Deep links accept `?symbol=XYZ` and refresh the summary; provides shortcut back to the dashboard
 
 ## 7. Scripts
 

@@ -5,7 +5,7 @@ AI Backtester - S3-first, AI-powered trading strategy backtesting application bu
 
 ## Key Features
 - S3-first data access: reads Parquet/CSV over HTTPS from S3 (no local filesystem)
-- Manifest-driven: `index.json` in S3 lists tickers & metadata for Dashboard/Data Explorer
+- Manifest-driven: `index.json` in S3 lists tickers & metadata for Dashboard/Data Warehouse
 - AI backtester: converts natural language prompts to DSL strategies using OpenAI
 - Charts & UI: Recharts + Tailwind for price and equity curve visualization
 - Strategy engine: SMA/EMA/RSI/MACD indicators with crossover and threshold rules

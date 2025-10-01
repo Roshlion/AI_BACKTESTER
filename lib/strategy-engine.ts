@@ -1,5 +1,5 @@
 import type { Row } from "../types/row";
-import { MACD, RSI, SMA, EMA } from "./indicators";
+import { ema, macd, rsi, sma } from "./indicators";
 
 type MacdRule = {
   type: "macd_cross";
@@ -142,7 +142,7 @@ export function normaliseDsl(candidate: any): StrategyDSL {
 
 export function runBacktest(dsl: StrategyDSL, data: Mkt[]): BacktestResult {
   const closes = data.map((d) => d.close);
-  const indicators: Record<string, number[]> = {};
+  const indicators: Record<string, Array<number | null>> = {};
   const sigEnter: boolean[] = new Array(data.length).fill(false);
   const sigExit: boolean[] = new Array(data.length).fill(false);
 
@@ -150,9 +150,39 @@ export function runBacktest(dsl: StrategyDSL, data: Mkt[]): BacktestResult {
     switch (rule.type) {
       case "macd_cross": {
         const { fast, slow, signal, enter, exit } = rule.params;
-        const { macd, signal: sig } = MACD(closes, fast, slow, signal);
-        const crossUp = macd.map((value, i) => i > 0 && macd[i - 1] <= sig[i - 1] && value > sig[i]);
-        const crossDown = macd.map((value, i) => i > 0 && macd[i - 1] >= sig[i - 1] && value < sig[i]);
+        const { macd: macdLine, signal: signalLine } = macd(closes, fast, slow, signal)
+        const crossUp = macdLine.map((_, i) => {
+          if (i === 0) return false
+          const currentMacd = macdLine[i]
+          const currentSignal = signalLine[i]
+          const prevMacd = macdLine[i - 1]
+          const prevSignal = signalLine[i - 1]
+          if (
+            currentMacd == null ||
+            currentSignal == null ||
+            prevMacd == null ||
+            prevSignal == null
+          ) {
+            return false
+          }
+          return prevMacd <= prevSignal && currentMacd > currentSignal
+        })
+        const crossDown = macdLine.map((_, i) => {
+          if (i === 0) return false
+          const currentMacd = macdLine[i]
+          const currentSignal = signalLine[i]
+          const prevMacd = macdLine[i - 1]
+          const prevSignal = signalLine[i - 1]
+          if (
+            currentMacd == null ||
+            currentSignal == null ||
+            prevMacd == null ||
+            prevSignal == null
+          ) {
+            return false
+          }
+          return prevMacd >= prevSignal && currentMacd < currentSignal
+        })
 
         for (let i = 0; i < data.length; i++) {
           const enterMode = enter ?? "bull";
@@ -170,16 +200,16 @@ export function runBacktest(dsl: StrategyDSL, data: Mkt[]): BacktestResult {
         const lo = low ?? 30;
         const hi = high ?? 70;
         const key = `rsi_${period}`;
-        const rsi = (indicators[key] ??= RSI(closes, period));
+        const rsiSeries = (indicators[key] ??= rsi(closes, period));
 
         for (let i = 0; i < data.length; i++) {
           const enterMode = enter ?? "long";
-          if (enterMode === "long") sigEnter[i] ||= rsi[i] <= lo;
-          if (enterMode === "short") sigEnter[i] ||= rsi[i] >= hi;
+          if (enterMode === "long") sigEnter[i] ||= (rsiSeries[i] ?? Number.POSITIVE_INFINITY) <= lo;
+          if (enterMode === "short") sigEnter[i] ||= (rsiSeries[i] ?? Number.NEGATIVE_INFINITY) >= hi;
 
           const exitMode = exit ?? "long";
-          if (exitMode === "long") sigExit[i] ||= rsi[i] >= hi;
-          if (exitMode === "short") sigExit[i] ||= rsi[i] <= lo;
+          if (exitMode === "long") sigExit[i] ||= (rsiSeries[i] ?? Number.NEGATIVE_INFINITY) >= hi;
+          if (exitMode === "short") sigExit[i] ||= (rsiSeries[i] ?? Number.POSITIVE_INFINITY) <= lo;
         }
         break;
       }
@@ -189,20 +219,36 @@ export function runBacktest(dsl: StrategyDSL, data: Mkt[]): BacktestResult {
         const fastKey = `${rule.type}_${fast}`;
         const slowKey = `${rule.type}_${slow}`;
         if (!indicators[fastKey]) {
-          indicators[fastKey] = rule.type === "sma_cross" ? SMA(closes, fast) : EMA(closes, fast);
+          indicators[fastKey] =
+            rule.type === "sma_cross" ? sma(closes, fast) : ema(closes, fast)
         }
         if (!indicators[slowKey]) {
-          indicators[slowKey] = rule.type === "sma_cross" ? SMA(closes, slow) : EMA(closes, slow);
+          indicators[slowKey] =
+            rule.type === "sma_cross" ? sma(closes, slow) : ema(closes, slow)
         }
-        const fastSeries = indicators[fastKey];
-        const slowSeries = indicators[slowKey];
+        const fastSeries = indicators[fastKey]!
+        const slowSeries = indicators[slowKey]!
 
-        const crossUp = fastSeries.map(
-          (value, i) => i > 0 && fastSeries[i - 1] <= slowSeries[i - 1] && value > slowSeries[i],
-        );
-        const crossDown = fastSeries.map(
-          (value, i) => i > 0 && fastSeries[i - 1] >= slowSeries[i - 1] && value < slowSeries[i],
-        );
+        const crossUp = fastSeries.map((value, i) => {
+          if (i === 0) return false
+          const prevFast = fastSeries[i - 1]
+          const prevSlow = slowSeries[i - 1]
+          const slowValue = slowSeries[i]
+          if (value == null || prevFast == null || prevSlow == null || slowValue == null) {
+            return false
+          }
+          return prevFast <= prevSlow && value > slowValue
+        })
+        const crossDown = fastSeries.map((value, i) => {
+          if (i === 0) return false
+          const prevFast = fastSeries[i - 1]
+          const prevSlow = slowSeries[i - 1]
+          const slowValue = slowSeries[i]
+          if (value == null || prevFast == null || prevSlow == null || slowValue == null) {
+            return false
+          }
+          return prevFast >= prevSlow && value < slowValue
+        })
 
         for (let i = 0; i < data.length; i++) {
           const enterMode = enter ?? "fast_above";
