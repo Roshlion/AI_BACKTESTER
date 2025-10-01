@@ -1,0 +1,14 @@
+{
+  "AAPL": "Technology",
+  "MSFT": "Technology",
+  "GOOGL": "Communication Services",
+  "AMZN": "Consumer Discretionary",
+  "NVDA": "Technology",
+  "META": "Communication Services",
+  "TSLA": "Consumer Discretionary",
+  "JPM": "Financials",
+  "XOM": "Energy",
+  "UNH": "Healthcare",
+  "HD": "Consumer Discretionary",
+  "V": "Financials"
+}

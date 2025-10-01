@@ -11,11 +11,16 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 
 ## Features
 
+- Three-tab workspace (Dashboard / Strategy Lab / Data Warehouse) with a shared app shell and global context store
+- Multi-ticker dashboard: search, full-row selection, isolate control, and eye link that deep-links into the warehouse
+- Indicator overlays: SMA/EMA (editable periods), RSI, MACD with dedicated panels, scale modes (absolute, indexed, small multiples)
+- Strategy Lab hand-off: dashboard selections populate tickers/indicators/dates via global context or URL parameters
+- Strategy Lab sector filters (when `public/sectors.json` or manifest metadata is present) auto-select relevant tickers
+- Data Warehouse: searchable symbol index with single-ticker chart, stats, and shortcut back to the dashboard
 - S3-first data access: reads Parquet/CSV over HTTPS from `s3://<bucket>/<prefix>/` (no local fs)
-- Manifest-driven: `index.json` in S3 lists tickers & metadata for Dashboard/Data Explorer
+- Manifest-driven: `index.json` in S3 lists tickers & metadata for dashboard and warehouse pages
 - AI backtester: `/api/strategy/generate` converts prompts to DSL; `/api/strategy/run` executes it
-- Charts & UI: Recharts + Tailwind. Pages for Dashboard, Backtester, Data Explorer
-- Tests: Vitest unit tests for normalizers/engine helpers
+- Tests: Vitest coverage for page exports, dashboard UX, chart behaviours, and strategy prefills
 
 ## Architecture
 
@@ -32,11 +37,12 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 - Scripts:
     - `scripts/build-manifest.ts` — walks `s3://bucket/prefix/` and writes `index.json` (no ACLs)
 
-## Repository Layout
-
 - `app/`
-    - `dashboard/` — Dashboard UI: ticker list, chart
-    - `strategy/` — AI backtester interface (prompt → DSL → run)
+    - `(shell)/layout.tsx` — tabbed layout + global store provider
+    - `(shell)/dashboard/` — dashboard client with multi-select, indicators, charts
+    - `(shell)/strategy/` — Strategy Lab server/client split with sector helpers
+    - `(shell)/explore/` — Data Warehouse entry point and client
+    - `backtester/` — legacy route (redirects to `/strategy`)
     - `api/` — Next.js API routes (Node runtime)
 - `lib/`
     - `env.ts` — environment helpers
@@ -45,7 +51,11 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 - `scripts/`
     - `build-manifest.ts` — generates `index.json` manifest in S3
 - `tests/`
-    - `normalizers.test.ts` — Vitest unit tests
+    - `pages-exports.test.ts` — guard for invalid App Router exports
+    - `dashboard-select.test.tsx` — ticker search, isolate, deep link
+    - `dashboard-to-strategy-handoff.test.tsx` — store + navigation handoff
+    - `chart-readability.test.tsx` — legend toggle, hover emphasis, scale modes
+    - `strategy.client.test.tsx` — Strategy Lab prefills
 
 ## Data & Manifest
 
@@ -112,10 +122,9 @@ Keep `.env.local` as the source of truth locally; replicate these in Vercel → 
 
 ## Backtesting (Quick Start)
 
-- Open `/backtester`, enter a prompt like:
-    - “EMA 12/26 long on cross up; exit on cross down”
-- Choose one or more tickers, pick a date range, and run.
-- You’ll see equity curve, trades, and summary stats.
+- Open `/dashboard`, select tickers/indicators/date range, then click **Create a strategy with this**.
+- The Strategy Lab (`/strategy`) opens prefilled; refine the prompt if needed and click **Generate strategy**.
+- Review the generated DSL, then click **Run backtest** to view equity curves, trades, and summary stats.
 
 ## Testing
 

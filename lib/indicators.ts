@@ -1,49 +1,105 @@
-// lib/indicators.ts
-export function SMA(values: number[], period: number): number[] {
-  const out: number[] = [];
-  let sum = 0;
-  for (let i = 0; i < values.length; i++) {
-    sum += values[i];
-    if (i >= period) sum -= values[i - period];
-    out.push(i >= period - 1 ? sum / period : NaN);
+export function sma(values: number[], period: number): Array<number | null> {
+  const p = Math.max(1, Math.round(period))
+  const result: Array<number | null> = new Array(values.length).fill(null)
+  if (values.length === 0) return result
+
+  let sum = 0
+  for (let i = 0; i < values.length; i += 1) {
+    sum += values[i]
+    if (i >= p) {
+      sum -= values[i - p]
+    }
+    if (i >= p - 1) {
+      result[i] = sum / p
+    }
   }
-  return out;
+
+  return result
 }
 
-export function EMA(values: number[], period: number): number[] {
-  const out: number[] = [];
-  const k = 2 / (period + 1);
-  let ema = 0;
-  for (let i = 0; i < values.length; i++) {
-    const v = values[i];
-    if (i === 0) ema = v;
-    else ema = v * k + ema * (1 - k);
-    out.push(i >= period - 1 ? ema : NaN);
+export function ema(values: number[], period: number): Array<number | null> {
+  const p = Math.max(1, Math.round(period))
+  const result: Array<number | null> = new Array(values.length).fill(null)
+  if (values.length === 0) return result
+
+  const alpha = 2 / (p + 1)
+  let emaValue = values[0]
+  for (let i = 0; i < values.length; i += 1) {
+    const value = values[i]
+    if (i === 0) {
+      emaValue = value
+    } else {
+      emaValue = alpha * value + (1 - alpha) * emaValue
+    }
+    if (i >= p - 1) {
+      result[i] = emaValue
+    }
   }
-  return out;
+
+  return result
 }
 
-export function MACD(values: number[], fast=12, slow=26, signal=9) {
-  const emaFast = EMA(values, fast);
-  const emaSlow = EMA(values, slow);
-  const macd = values.map((_, i) => emaFast[i] - emaSlow[i]);
-  const sig = EMA(macd.map(v => (isFinite(v) ? v : 0)), signal);
-  const hist = macd.map((v, i) => v - sig[i]);
-  return { macd, signal: sig, hist };
+export function rsi(values: number[], period = 14): Array<number | null> {
+  const p = Math.max(1, Math.round(period))
+  if (values.length <= 1) {
+    return new Array(values.length).fill(null)
+  }
+
+  const gains: number[] = []
+  const losses: number[] = []
+  for (let i = 1; i < values.length; i += 1) {
+    const delta = values[i] - values[i - 1]
+    gains.push(Math.max(delta, 0))
+    losses.push(Math.max(-delta, 0))
+  }
+
+  const avgGains = ema(gains, p)
+  const avgLosses = ema(losses, p)
+  const result: Array<number | null> = new Array(values.length).fill(null)
+
+  for (let i = 1; i < values.length; i += 1) {
+    const gain = avgGains[i - 1]
+    const loss = avgLosses[i - 1]
+    if (gain == null || loss == null) {
+      result[i] = null
+      continue
+    }
+    if (loss === 0) {
+      result[i] = 100
+      continue
+    }
+    const rs = gain / loss
+    result[i] = 100 - 100 / (1 + rs)
+  }
+
+  return result
 }
 
-export function RSI(values: number[], period=14): number[] {
-  const out: number[] = [];
-  let gain = 0, loss = 0;
-  for (let i = 1; i < values.length; i++) {
-    const ch = values[i] - values[i-1];
-    const g = Math.max(ch, 0), l = Math.max(-ch, 0);
-    if (i <= period) { gain += g; loss += l; out.push(NaN); continue; }
-    gain = (gain*(period-1) + g)/period;
-    loss = (loss*(period-1) + l)/period;
-    const rs = loss === 0 ? 100 : 100*(1 - 1/(1 + gain/loss));
-    out.push(rs);
+export type MacdSeries = {
+  macd: Array<number | null>
+  signal: Array<number | null>
+}
+
+export function macd(values: number[], fast = 12, slow = 26, signalPeriod = 9): MacdSeries {
+  const slowEma = ema(values, slow)
+  const fastEma = ema(values, fast)
+  const macdLine: Array<number | null> = new Array(values.length).fill(null)
+
+  for (let i = 0; i < values.length; i += 1) {
+    const fastValue = fastEma[i]
+    const slowValue = slowEma[i]
+    if (fastValue == null || slowValue == null) {
+      macdLine[i] = null
+    } else {
+      macdLine[i] = fastValue - slowValue
+    }
   }
-  out.unshift(NaN);
-  return out;
+
+  const macdValues = macdLine.map((value) => value ?? 0)
+  const signalLineRaw = ema(macdValues, signalPeriod)
+  const signalLine: Array<number | null> = signalLineRaw.map((value, index) =>
+    macdLine[index] == null ? null : value,
+  )
+
+  return { macd: macdLine, signal: signalLine }
 }
