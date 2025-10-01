@@ -1,42 +1,53 @@
-"use client";
-import { useState } from "react";
+import { Suspense } from "react";
+import StrategyClient from "./StrategyClient";
 
-const DEFAULT_DSL = `{
-  "tickers": ["AAPL","MSFT"],
-  "rules": [
-    {"type":"sma","length":10,"field":"close","alias":"sma10"},
-    {"type":"cross","fast":"close","slow":"sma10","enter":"fast_above","exit":"fast_below"}
-  ],
-  "capital": 100000
-}`;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export default function StrategyPage() {
-  const [dsl, setDsl] = useState(DEFAULT_DSL);
-  const [result, setResult] = useState<any>(null);
-  const [err, setErr] = useState("");
-
-  const run = async () => {
-    setErr("");
-    try {
-      const res = await fetch("/api/strategy/run", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: dsl,
-      });
-      const j = await res.json();
-      setResult(j);
-    } catch (e: any) {
-      setErr(String(e));
-    }
+type PageProps = {
+  searchParams?: {
+    tickers?: string;
+    indicators?: string;
+    start?: string;
+    end?: string;
   };
+};
+
+function parseQueryList(value?: string): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function normaliseTickers(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const upper = value.toUpperCase();
+    if (upper && !seen.has(upper)) {
+      seen.add(upper);
+      result.push(upper);
+    }
+  }
+  return result;
+}
+
+export default function StrategyPage({ searchParams }: PageProps) {
+  const tickers = normaliseTickers(parseQueryList(searchParams?.tickers));
+  const indicators = parseQueryList(searchParams?.indicators);
+  const start = searchParams?.start ?? null;
+  const end = searchParams?.end ?? null;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-2xl font-bold">Strategy Lab</h1>
-      <textarea value={dsl} onChange={(e) => setDsl(e.target.value)} className="w-full h-64 text-black p-2 mt-4 rounded" />
-      <button onClick={run} className="mt-3 px-4 py-2 bg-blue-600 rounded">Run</button>
-      {err && <pre className="mt-4 text-red-400">{err}</pre>}
-      {result && <pre className="mt-4 whitespace-pre-wrap">{JSON.stringify(result, null, 2)}</pre>}
-    </div>
+    <Suspense fallback={<div className="p-4 text-sm">Loading strategy…</div>}>
+      <StrategyClient
+        initialTickers={tickers}
+        initialIndicators={indicators}
+        initialStartDate={start}
+        initialEndDate={end}
+      />
+    </Suspense>
   );
 }

@@ -14,7 +14,9 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 - S3-first data access: reads Parquet/CSV over HTTPS from `s3://<bucket>/<prefix>/` (no local fs)
 - Manifest-driven: `index.json` in S3 lists tickers & metadata for Dashboard/Data Explorer
 - AI backtester: `/api/strategy/generate` converts prompts to DSL; `/api/strategy/run` executes it
-- Charts & UI: Recharts + Tailwind. Pages for Dashboard, Backtester, Data Explorer
+- Dashboard comparisons: full-row multi-select with "only" isolation, adjustable SMA/EMA/RSI/MACD overlays, auto-fit date ranges with reset, and a responsive layout that stacks cleanly on mobile before routing into the Strategy Lab
+- Strategy hand-off: `/strategy` consumes server-parsed query params and pre-fills tickers, indicator hints, and date range in a client component so users can tweak prompt/DSL before running a backtest
+- Charts & UI: Recharts + Tailwind with multi-ticker overlays, indicator toggles, quick hand-offs to the Strategy Lab, and guardrails to avoid App Router suspense issues
 - Tests: Vitest unit tests for normalizers/engine helpers
 
 ## Architecture
@@ -35,8 +37,8 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 ## Repository Layout
 
 - `app/`
-    - `dashboard/` — Dashboard UI: ticker list, chart
-    - `strategy/` — AI backtester interface (prompt → DSL → run)
+    - `dashboard/` — Dashboard UI: multi-select tickers, indicator overlays, strategy shortcut
+    - `strategy/` — AI backtester interface (DSL editor, prefilled via dashboard shortcut)
     - `api/` — Next.js API routes (Node runtime)
 - `lib/`
     - `env.ts` — environment helpers
@@ -114,6 +116,7 @@ Keep `.env.local` as the source of truth locally; replicate these in Vercel → 
 
 - Open `/backtester`, enter a prompt like:
     - “EMA 12/26 long on cross up; exit on cross down”
+- Or jump from the dashboard via **Create a strategy with this** to pre-fill tickers/indicators.
 - Choose one or more tickers, pick a date range, and run.
 - You’ll see equity curve, trades, and summary stats.
 
@@ -156,3 +159,12 @@ Keep `.env.local` as the source of truth locally; replicate these in Vercel → 
 
 - Polygon is not required for core operation; S3 Parquet is the data source. Polygon can be used later for refresh jobs.
 - ML strategies are scaffolded and intentionally disabled in serverless paths; wire up a Python service when ready.
+
+### Strategy Page (Next.js App Router)
+The `/strategy` page reads query params via `Page({ searchParams })` in a Server Component and passes them into a Client Component wrapped in `<Suspense>`.
+**Do not** use `useSearchParams()` inside a Server Component. If client-side URL access is required, ensure the component tree is inside a `<Suspense>` boundary.
+The page exports `dynamic = 'force-dynamic'` and `revalidate = 0` to avoid SSG bailouts for query-driven UI.
+
+### App Router page exports
+`app/**/page.tsx` files must only export the fields supported by Next.js (e.g., `default`, `dynamic`, `revalidate`).
+Move helpers into sibling modules such as `utils.ts` or keep them non-exported inside the page file. A regression test (`tests/pages.exports.test.ts`) watches for disallowed exports.

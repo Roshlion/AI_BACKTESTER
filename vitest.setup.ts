@@ -1,3 +1,4 @@
+import React from "react";
 import { vi } from "vitest";
 
 process.env.AWS_BUCKET ||= "dummy-bucket";
@@ -23,3 +24,18 @@ vi.stubGlobal("fetch", vi.fn(async (url: any) => {
   }
   return new Response("not found", { status: 404 });
 }));
+
+if (!("ResizeObserver" in globalThis)) {
+  class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    value: ResizeObserver,
+    writable: true,
+  });
+}
+
+(globalThis as any).React = React;
