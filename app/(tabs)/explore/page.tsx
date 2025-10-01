@@ -234,11 +234,11 @@ export default function DataExplorerPage() {
 
             <div className="flex space-x-3">
               <Link
-                href="/backtester"
+                href="/strategy"
                 className="flex items-center px-4 py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg transition-colors"
               >
                 <TrendingUp className="w-4 h-4 mr-2" />
-                Backtester
+                Open Strategy Lab
               </Link>
             </div>
           </div>

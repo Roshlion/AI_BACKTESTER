@@ -120,16 +120,30 @@ Execution (per ticker):
 
 ## 6. Frontend Pages
 
+- Dashboard, Strategy, and Explore share the route-group layout `app/(tabs)/layout.tsx`, which renders the tab chrome and injects the shared `StrategyStateProvider` for cross-tab hand-offs.
+
 - `/dashboard`
-    - Loads `/api/index`, shows ticker count and quick info
-    - Selecting a ticker loads `/api/local-data` and renders a price chart + small stats
+    - Loads `/api/index`, shows ticker count and quick info in a responsive card layout (columns on desktop, stacked on mobile)
+    - Search-as-you-type ticker list with a capped initial display (encourage filtering), full-row highlight, keyboard support, and an isolate icon (with tooltip) that clears other selections
+    - Toggle SMA/EMA/RSI/MACD overlays (SMA/EMA periods editable via double-click); indicator values computed client-side via `lib/indicators`
+    - Start/end date inputs auto-fill to the combined data range, respect manual overrides, and can be reset to the full span
+    - "Create a strategy with this" updates the shared strategy state (tickers, indicators, prompt, date range) and routes to the Strategy Lab tab
 
 - `/backtester`
-    - Textarea for prompt → `/api/strategy/generate` → DSL JSON
-    - Allows manual DSL editing
+    - Textarea for prompt/DSL → `/api/strategy/generate` → DSL JSON
+    - Allows manual DSL editing independent of the dashboard shortcut
     - Runs `/api/strategy/run`, shows equity curve, trades, metrics
 
-- `/data-explorer`
+- `/strategy`
+    - Server component parses `tickers`, `indicators`, `start`, and `end` from `searchParams`, normalises them, and hands them to the client layer via `<Suspense>`
+    - Client component consumes the shared strategy store (falling back to query params) to preselect tickers, seed the backtest dates, show indicator hints in the prompt, and keep the state in sync while users regenerate DSL/prompt from the current selection
+    - Page remains `dynamic` (`export const dynamic = 'force-dynamic'`) with `revalidate = 0` to avoid prerender errors for query-driven UI
+
+- App Router conventions
+    - Do **not** export helpers, types, or utilities from `app/**/page.tsx`; keep them local or move them into sibling modules like `utils.ts`
+    - When a page needs client-side hooks, keep the page itself as the server boundary and render a `*Client.tsx` component inside `<Suspense>`
+
+- `/explore`
     - Lists all tickers from manifest
     - Optional filters (sector/industry) if present in manifest metadata
 
@@ -167,6 +181,7 @@ Vercel:
 - Vercel build “stream did not contain valid UTF-8” for `app/.../page.tsx`:
     - Fix by re-saving files as UTF-8 LF and adding `.gitattributes` (`* text=auto eol=lf`)
 - ML strategies: scaffold present; execution disabled in serverless paths; integrate Python service when ready
+- Sector filters: manifest currently lacks sector metadata, so UI intentionally hides sector selectors until that data is available
 
 ## 10. Operability (Runbooks)
 

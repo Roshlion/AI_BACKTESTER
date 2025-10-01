@@ -1,3 +1,4 @@
+import React from "react";
 import { vi } from "vitest";
 
 process.env.AWS_BUCKET ||= "dummy-bucket";
@@ -21,5 +22,28 @@ vi.stubGlobal("fetch", vi.fn(async (url: any) => {
       tickers: ["AAPL", "AMD", "AMZN"],
     });
   }
+  if (u.includes("/api/local-data")) {
+    return okJson({
+      rows: [
+        { date: "2024-01-01", open: 1, high: 1, low: 1, close: 1, volume: 100 },
+        { date: "2024-01-02", open: 2, high: 2, low: 2, close: 2, volume: 100 },
+      ],
+    });
+  }
   return new Response("not found", { status: 404 });
 }));
+
+if (!("ResizeObserver" in globalThis)) {
+  class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    value: ResizeObserver,
+    writable: true,
+  });
+}
+
+(globalThis as any).React = React;

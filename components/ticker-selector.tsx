@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
+import { Target } from "lucide-react";
 
-interface TickerInfo {
+export interface TickerInfo {
   ticker: string;
   format?: string;
   records?: number;
@@ -11,47 +20,159 @@ interface TickerInfo {
 }
 
 interface TickerSelectorProps {
-  onTickerSelect: (ticker: string) => void;
-  selectedTicker?: string;
+  onSelectionChange: (tickers: string[]) => void;
+  selectedTickers: string[];
 }
 
-export function TickerSelector({ onTickerSelect, selectedTicker }: TickerSelectorProps) {
+function normaliseTicker(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+type TickerRowProps = {
+  item: TickerInfo;
+  selected: boolean;
+  onToggle: (ticker: string) => void;
+  onSelectOnly: (ticker: string) => void;
+};
+
+const TickerRow = memo(function TickerRow({ item, selected, onToggle, onSelectOnly }: TickerRowProps) {
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onToggle(item.ticker);
+      }
+    },
+    [item.ticker, onToggle],
+  );
+
+  const handleOnly = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      onSelectOnly(item.ticker);
+    },
+    [item.ticker, onSelectOnly],
+  );
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      onClick={() => onToggle(item.ticker)}
+      onKeyDown={handleKeyDown}
+      data-testid={`ticker-row-${item.ticker}`}
+      className={`group flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+        selected
+          ? "bg-blue-600/40 text-blue-50 border border-blue-400"
+          : "bg-gray-700 text-gray-100 border border-transparent hover:bg-gray-600"
+      }`}
+    >
+      <span className="tracking-wide">{item.ticker}</span>
+      <button
+        type="button"
+        onClick={handleOnly}
+        title="Isolate this ticker"
+        aria-label={`Isolate ${item.ticker}`}
+        className="rounded-full p-1 text-blue-200 transition-colors hover:bg-blue-500/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+      >
+        <Target aria-hidden className="h-4 w-4" />
+      </button>
+    </div>
+  );
+});
+
+export const __TickerRowTest = TickerRow;
+
+export function TickerSelector({ onSelectionChange, selectedTickers }: TickerSelectorProps) {
   const [tickers, setTickers] = useState<TickerInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadTickers() {
       try {
         const response = await fetch("/api/index");
         const data = await response.json();
 
-        if (data.tickers) {
+        if (!cancelled && data.tickers) {
           const tickerList = Array.isArray(data.tickers)
-            ? data.tickers.map((t: any) => typeof t === "string" ? { ticker: t } : t)
+            ? data.tickers.map((t: any) =>
+                typeof t === "string"
+                  ? { ticker: normaliseTicker(t) }
+                  : { ...t, ticker: normaliseTicker(t.ticker ?? "") },
+              )
             : [];
           setTickers(tickerList);
         }
       } catch (err) {
-        setError("Failed to load tickers");
-        console.error("Error loading tickers:", err);
+        if (!cancelled) {
+          setError("Failed to load tickers");
+          console.error("Error loading tickers:", err);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadTickers();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const filteredTickers = tickers.filter(ticker =>
-    ticker.ticker.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const filteredTickers = useMemo(
+    () => filterTickersList(tickers, debouncedSearch),
+    [tickers, debouncedSearch],
+  );
+
+  const displayTickers = useMemo(
+    () => limitTickersList(filteredTickers, debouncedSearch),
+    [filteredTickers, debouncedSearch],
+  );
+  const truncated = filteredTickers.length > displayTickers.length;
+
+  const handleToggle = useCallback(
+    (ticker: string) => {
+      const normalised = normaliseTicker(ticker);
+      const alreadySelected = selectedTickers.includes(normalised);
+      const next = alreadySelected
+        ? selectedTickers.filter((value) => value !== normalised)
+        : [...selectedTickers, normalised];
+      onSelectionChange(next);
+    },
+    [onSelectionChange, selectedTickers],
+  );
+
+  const handleSelectOnly = useCallback(
+    (ticker: string) => {
+      onSelectionChange(isolateTickerSelection(ticker));
+    },
+    [onSelectionChange],
+  );
+
+  const handleRemoveChip = useCallback(
+    (ticker: string) => {
+      onSelectionChange(selectedTickers.filter((value) => value !== ticker));
+    },
+    [onSelectionChange, selectedTickers],
   );
 
   if (loading) {
     return (
       <div className="p-4 bg-gray-800 rounded-lg">
-        <p className="text-gray-400">Loading tickers...</p>
+        <p className="text-gray-400">Loading tickers…</p>
       </div>
     );
   }
@@ -65,52 +186,89 @@ export function TickerSelector({ onTickerSelect, selectedTicker }: TickerSelecto
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4">
-      <h3 className="text-lg font-semibold text-white mb-3">
-        Available Tickers ({tickers.length})
-      </h3>
+    <div className="bg-gray-800 rounded-lg p-4 flex flex-col h-full border border-gray-700/60">
+      <div className="mb-4 space-y-1">
+        <h3 className="text-lg font-semibold text-white">Available Tickers ({tickers.length})</h3>
+        <p className="text-xs text-gray-400">
+          Click a row to toggle it. Use the “only” action to isolate a single ticker quickly.
+        </p>
+      </div>
 
+      <label className="sr-only" htmlFor="ticker-search">
+        Search tickers
+      </label>
       <input
+        id="ticker-search"
         type="text"
-        placeholder="Search tickers..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search tickers…"
+        value={searchInput}
+        onChange={(event) => setSearchInput(event.target.value)}
         className="w-full px-3 py-2 mb-3 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
       />
 
-      <div className="max-h-64 overflow-y-auto">
-        {filteredTickers.length === 0 ? (
+      <div className="flex-1 overflow-y-auto pr-1">
+        {displayTickers.length === 0 ? (
           <p className="text-gray-400">No tickers found</p>
         ) : (
           <div className="space-y-1">
-            {filteredTickers.map((ticker) => (
-              <button
+            {displayTickers.map((ticker) => (
+              <TickerRow
                 key={ticker.ticker}
-                onClick={() => onTickerSelect(ticker.ticker)}
-                className={`w-full text-left px-3 py-2 rounded transition-colors ${
-                  selectedTicker === ticker.ticker
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">{ticker.ticker}</span>
-                  {ticker.records && (
-                    <span className="text-xs text-gray-400">
-                      {ticker.records.toLocaleString()} records
-                    </span>
-                  )}
-                </div>
-                {ticker.lastDate && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    Latest: {ticker.lastDate}
-                  </div>
-                )}
-              </button>
+                item={ticker}
+                selected={selectedTickers.includes(ticker.ticker)}
+                onToggle={handleToggle}
+                onSelectOnly={handleSelectOnly}
+              />
             ))}
           </div>
         )}
       </div>
+
+      {truncated && (
+        <p className="mt-3 text-[11px] text-gray-400">
+          Showing the first {displayTickers.length} tickers. Refine the search to narrow the list.
+        </p>
+      )}
+
+      {selectedTickers.length > 0 && (
+        <div className="mt-4 rounded-lg border border-blue-600/50 bg-blue-900/20 p-3 text-xs text-blue-100">
+          <div className="mb-2 flex items-center justify-between text-sm font-semibold">
+            <span>Selected ({selectedTickers.length})</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {selectedTickers.map((ticker) => (
+              <button
+                key={ticker}
+                type="button"
+                onClick={() => handleRemoveChip(ticker)}
+                data-testid={`selected-chip-${ticker}`}
+                className="flex items-center gap-1 rounded-full bg-blue-700/70 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-blue-600"
+                aria-label={`Remove ${ticker}`}
+              >
+                <span>{ticker}</span>
+                <span aria-hidden>×</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+export function filterTickersList(list: TickerInfo[], query: string): TickerInfo[] {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return list;
+  return list.filter((ticker) => ticker.ticker.toLowerCase().includes(trimmed));
+}
+
+export function limitTickersList(list: TickerInfo[], query: string, limit = 30): TickerInfo[] {
+  if (query.trim()) {
+    return list;
+  }
+  return list.slice(0, Math.min(limit, list.length));
+}
+
+export function isolateTickerSelection(ticker: string): string[] {
+  return [normaliseTicker(ticker)].filter(Boolean);
 }

@@ -14,7 +14,10 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 - S3-first data access: reads Parquet/CSV over HTTPS from `s3://<bucket>/<prefix>/` (no local fs)
 - Manifest-driven: `index.json` in S3 lists tickers & metadata for Dashboard/Data Explorer
 - AI backtester: `/api/strategy/generate` converts prompts to DSL; `/api/strategy/run` executes it
-- Charts & UI: Recharts + Tailwind. Pages for Dashboard, Backtester, Data Explorer
+- Unified three-tab navigation (Dashboard, Strategy Lab, Explore Data) with a shared layout and active tab highlighting
+- Dashboard comparisons: full-row multi-select with an isolate icon, filtered ticker search, adjustable SMA/EMA/RSI/MACD overlays, and auto-fit date ranges with reset in a mobile-friendly layout
+- Strategy hand-off: Dashboard updates a shared strategy store before routing to `/strategy`, which consumes server-parsed query params and shared context to pre-fill tickers, indicator hints, prompt text, and optional date range in a client component so users can tweak prompt/DSL before running a backtest
+- Charts & UI: Recharts + Tailwind with multi-ticker overlays, indicator toggles, quick hand-offs to the Strategy Lab, and guardrails to avoid App Router suspense issues
 - Tests: Vitest unit tests for normalizers/engine helpers
 
 ## Architecture
@@ -35,8 +38,10 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 ## Repository Layout
 
 - `app/`
-    - `dashboard/` — Dashboard UI: ticker list, chart
-    - `strategy/` — AI backtester interface (prompt → DSL → run)
+    - `(tabs)/layout.tsx` — shared tab chrome + providers for the main surfaces
+    - `(tabs)/dashboard/` — Dashboard UI: filtered ticker list, indicator overlays, strategy shortcut
+    - `(tabs)/strategy/` — AI backtester interface (DSL editor, prefilled via dashboard shortcut or shared store)
+    - `(tabs)/explore/` — Data explorer placeholder driven by the manifest
     - `api/` — Next.js API routes (Node runtime)
 - `lib/`
     - `env.ts` — environment helpers
@@ -112,9 +117,9 @@ Keep `.env.local` as the source of truth locally; replicate these in Vercel → 
 
 ## Backtesting (Quick Start)
 
-- Open `/backtester`, enter a prompt like:
-    - “EMA 12/26 long on cross up; exit on cross down”
-- Choose one or more tickers, pick a date range, and run.
+- Open `/dashboard` (tab defaults) and pick tickers using the searchable list (type to filter; use the isolate icon for a quick single-symbol focus).
+- Toggle indicators or adjust date range if desired, then click **Create a strategy with this** to switch to the Strategy Lab tab with state prefilled.
+- Review/edit the prompt, generate DSL, and run a backtest from the Strategy tab.
 - You’ll see equity curve, trades, and summary stats.
 
 ## Testing
@@ -156,3 +161,12 @@ Keep `.env.local` as the source of truth locally; replicate these in Vercel → 
 
 - Polygon is not required for core operation; S3 Parquet is the data source. Polygon can be used later for refresh jobs.
 - ML strategies are scaffolded and intentionally disabled in serverless paths; wire up a Python service when ready.
+
+### Strategy Page (Next.js App Router)
+The `/strategy` page reads query params via `Page({ searchParams })` in a Server Component and passes them into a Client Component wrapped in `<Suspense>`.
+**Do not** use `useSearchParams()` inside a Server Component. If client-side URL access is required, ensure the component tree is inside a `<Suspense>` boundary.
+The page exports `dynamic = 'force-dynamic'` and `revalidate = 0` to avoid SSG bailouts for query-driven UI and consumes the shared `StrategyStateProvider` so selections from the dashboard remain available without relying solely on query params.
+
+### App Router page exports
+`app/**/page.tsx` files must only export the fields supported by Next.js (e.g., `default`, `dynamic`, `revalidate`).
+Move helpers into sibling modules such as `utils.ts` or keep them non-exported inside the page file. A regression test (`tests/pages.exports.test.ts`) watches for disallowed exports.
