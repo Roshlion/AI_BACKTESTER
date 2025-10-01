@@ -122,12 +122,21 @@ Execution (per ticker):
 
 - `/dashboard`
     - Loads `/api/index`, shows ticker count and quick info
-    - Selecting a ticker loads `/api/local-data` and renders a price chart + small stats
+    - Multi-select tickers to fetch `/api/local-data` for each symbol and merge into overlay charts
+    - Toggle SMA/EMA/RSI/MACD overlays (SMA/EMA periods editable via double-click); indicator values computed client-side via `lib/indicators`
+    - Start/end date inputs auto-fill to the combined data range and can be reset to the full span
+    - "Create a strategy with this" button passes selected tickers/indicators/date range to the Strategy Lab via query params
 
 - `/backtester`
-    - Textarea for prompt → `/api/strategy/generate` → DSL JSON
+    - Textarea for prompt/DSL → `/api/strategy/generate` → DSL JSON
+    - Prefills DSL/tickers/date range when navigated from the dashboard shortcut
     - Allows manual DSL editing
     - Runs `/api/strategy/run`, shows equity curve, trades, metrics
+
+- `/strategy`
+    - Parses `tickers` and `indicators` from `searchParams` in the server layer.
+    - Passes parsed values to a Client Component that is wrapped in `<Suspense>`.
+    - Marks the page `dynamic` (`export const dynamic = 'force-dynamic'`) with `revalidate = 0` to avoid prerender errors for varying query strings.
 
 - `/data-explorer`
     - Lists all tickers from manifest
