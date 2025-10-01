@@ -121,13 +121,21 @@ Execution (per ticker):
 ## 6. Frontend Pages
 
 - `/dashboard`
-    - Loads `/api/index`, shows ticker count and quick info
-    - Selecting a ticker loads `/api/local-data` and renders a price chart + small stats
+    - Loads `/api/index`, shows ticker count and quick info in a responsive card layout (columns on desktop, stacked on mobile)
+    - Full-row ticker multi-select with highlight + keyboard support; "only" affordance isolates a single ticker while chips beneath the list allow deselection
+    - Toggle SMA/EMA/RSI/MACD overlays (SMA/EMA periods editable via double-click); indicator values computed client-side via `lib/indicators`
+    - Start/end date inputs auto-fill to the combined data range, respect manual overrides, and can be reset to the full span
+    - "Create a strategy with this" button assembles `tickers`, `indicators`, `start`, and `end` query params and routes directly to the Strategy Lab
 
 - `/backtester`
-    - Textarea for prompt → `/api/strategy/generate` → DSL JSON
-    - Allows manual DSL editing
+    - Textarea for prompt/DSL → `/api/strategy/generate` → DSL JSON
+    - Allows manual DSL editing independent of the dashboard shortcut
     - Runs `/api/strategy/run`, shows equity curve, trades, metrics
+
+- `/strategy`
+    - Server component parses `tickers`, `indicators`, `start`, and `end` from `searchParams`, normalises them, and hands them to the client layer via `<Suspense>`
+    - Client component preselects tickers, seeds the backtest dates, shows indicator hints in the prompt, and lets users regenerate DSL/prompt from the current selection
+    - Page remains `dynamic` (`export const dynamic = 'force-dynamic'`) with `revalidate = 0` to avoid prerender errors for query-driven UI
 
 - `/data-explorer`
     - Lists all tickers from manifest
@@ -167,6 +175,7 @@ Vercel:
 - Vercel build “stream did not contain valid UTF-8” for `app/.../page.tsx`:
     - Fix by re-saving files as UTF-8 LF and adding `.gitattributes` (`* text=auto eol=lf`)
 - ML strategies: scaffold present; execution disabled in serverless paths; integrate Python service when ready
+- Sector filters: manifest currently lacks sector metadata, so UI intentionally hides sector selectors until that data is available
 
 ## 10. Operability (Runbooks)
 
