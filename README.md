@@ -2,20 +2,43 @@
 
 # AI Backtester (S3-First, Next.js 14)
 
-Web-based, AI-powered strategy backtesting over historical market data stored as **Parquet** in **AWS S3**. Users can:
-- Browse available datasets from an S3 **manifest** (`index.json`)
-- Generate strategies from **natural language** (OpenAI → DSL)
-- Run **backtests** (SMA/EMA/RSI/MACD, crossovers, thresholds)
-- Visualize **prices** and **equity curves** in the UI
-- (Future) Run **ML strategies** via Python
+Web-based, AI-powered strategy backtesting over historical market data stored as **Parquet** in **AWS S3**. The application features a modern three-tab interface for comprehensive trading strategy development and analysis.
 
-## Features
+## New Three-Tab Navigation
 
-- S3-first data access: reads Parquet/CSV over HTTPS from `s3://<bucket>/<prefix>/` (no local fs)
-- Manifest-driven: `index.json` in S3 lists tickers & metadata for Dashboard/Data Explorer
-- AI backtester: `/api/strategy/generate` converts prompts to DSL; `/api/strategy/run` executes it
-- Charts & UI: Recharts + Tailwind. Pages for Dashboard, Backtester, Data Explorer
-- Tests: Vitest unit tests for normalizers/engine helpers
+**Dashboard** (default): Multi-ticker selection with interactive charts, indicator configuration, and seamless handoff to Strategy Lab.
+
+**Strategy Lab**: AI-powered strategy generation with natural language prompts, sector-based ticker selection, and comprehensive backtesting capabilities.
+
+**Data Warehouse**: Comprehensive data exploration with filtering, searching, and metadata viewing for all available datasets.
+
+## Key Features
+
+### Dashboard
+- **Multi-ticker selection**: Full-row highlight selection with search filtering
+- **Eye icon deep linking**: Click the eye icon to view any ticker in the Data Warehouse
+- **Isolate action**: Context menu to focus on a single ticker
+- **Indicator configuration**: Toggle SMA/EMA with editable periods, RSI (14), and MACD (12,26,9)
+- **Auto date range**: Automatically computes date range from selected tickers' data spans
+- **Create strategy handoff**: Seamlessly switches to Strategy Lab with pre-filled context
+
+### Strategy Lab
+- **Prefill from Dashboard**: Accepts tickers, indicators, and date ranges from Dashboard or URL
+- **Sector selection**: Multi-select sectors to automatically include all tickers from those sectors (if sector data available)
+- **AI strategy generation**: Natural language prompts converted to executable DSL
+- **Standalone operation**: Works independently when accessed directly without prefill
+
+### Data Warehouse
+- **Symbol-level pages**: Deep link support (e.g., `/explore?symbol=AAPL`) for detailed ticker views
+- **Comprehensive filtering**: Search by ticker, sector, industry; date range filtering; sortable columns
+- **Metadata exploration**: Records count, date ranges, file formats, sector classifications
+
+### Chart Readability & Performance
+- **Series management**: Click legend to hide/show individual tickers; hover for emphasis
+- **Multi-scale support**: Price (absolute), Indexed % (normalized to 100), Small multiples (grid view)
+- **Indicator panels**: RSI and MACD in separate sub-panels with reference lines
+- **Performance optimization**: Automatic downsampling for >5k data points
+- **Error boundaries**: Graceful handling of missing data for selected symbols
 
 ## Architecture
 
@@ -35,17 +58,29 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 ## Repository Layout
 
 - `app/`
-    - `dashboard/` — Dashboard UI: ticker list, chart
-    - `strategy/` — AI backtester interface (prompt → DSL → run)
+    - `(shell)/` — Main application shell with three-tab layout
+        - `dashboard/` — Multi-ticker Dashboard with selection and indicators
+        - `strategy/` — Strategy Lab with AI generation and sector selection
+        - `explore/` — Data Warehouse for dataset exploration
+    - `store/` — Zustand global state for strategy handoff
     - `api/` — Next.js API routes (Node runtime)
 - `lib/`
     - `env.ts` — environment helpers
     - `safeParquet.ts`, `ingest-bars.ts` — Parquet/CSV loaders + normalization (see docs)
     - `strategy-engine.ts` — DSL execution, indicators (SMA/EMA/RSI/MACD)
+    - `colors.ts` — chart color palette for multi-ticker readability
+    - `downsample.ts` — chart performance optimization utilities
+- `components/`
+    - `MultiTickerChart.tsx` — enhanced chart with multi-ticker support and readability features
 - `scripts/`
     - `build-manifest.ts` — generates `index.json` manifest in S3
+    - `check-page-exports.js` — validates Next.js App Router page exports
 - `tests/`
-    - `normalizers.test.ts` — Vitest unit tests
+    - `normalizers.test.ts`, `indicators.test.ts` — Vitest unit tests
+    - `pages-exports.test.ts` — validates page export compliance
+    - `dashboard-select.test.tsx` — Dashboard ticker selection functionality
+    - `dashboard-to-strategy-handoff.test.tsx` — Strategy Lab handoff testing
+    - `chart-readability.test.tsx` — Multi-ticker chart feature testing
 
 ## Data & Manifest
 
@@ -123,6 +158,23 @@ Keep `.env.local` as the source of truth locally; replicate these in Vercel → 
 
         npm run typecheck
         npm run test
+
+## Developer Notes
+
+### App Router Page Exports
+- All `app/**/page.tsx` files must only export allowed Next.js exports: `default`, `generateMetadata`, `generateStaticParams`, `revalidate`, `dynamic`, `dynamicParams`, `fetchCache`, `runtime`, `preferredRegion`, `maxDuration`, `metadata`
+- Helper functions must be moved to `utils.ts` files in the same directory
+- Use `npm run check-page-exports` or `node scripts/check-page-exports.js` to validate compliance
+
+### Strategy Page Server→Client Pattern
+- `app/(shell)/strategy/page.tsx` is a Server Component that parses `searchParams` and passes values to `StrategyClient` wrapped in `<Suspense>`
+- `StrategyClient.tsx` is a Client Component that renders the Strategy Lab UI
+- Uses `dynamic='force-dynamic'` and `revalidate=0` for fresh data on each request
+
+### Global State Handoff
+- Zustand store in `app/store/strategyStore.ts` manages strategy handoff between Dashboard and Strategy Lab
+- Dashboard calls `setStrategy()` with tickers, indicators, and date range, then navigates to `/strategy`
+- Strategy Lab reads from URL params if present, otherwise falls back to store values
 
 ## Deploying to Vercel
 

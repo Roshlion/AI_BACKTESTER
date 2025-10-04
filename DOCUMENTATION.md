@@ -17,9 +17,9 @@ Polygon is optional (for periodic refresh); day-to-day operation uses S3 data on
 
 Flow:
 
-- S3 (Parquet + `index.json`)  
-  → Next.js 14 API routes (Node runtime)  
-  → UI pages (Dashboard, Backtester, Data Explorer)
+- S3 (Parquet + `index.json`)
+  → Next.js 14 API routes (Node runtime)
+  → Three-tab shell UI (Dashboard, Strategy Lab, Data Warehouse)
 
 Key invariants:
 
@@ -120,27 +120,78 @@ Execution (per ticker):
 
 ## 6. Frontend Pages
 
-- `/dashboard`
-    - Loads `/api/index`, shows ticker count and quick info
-    - Selecting a ticker loads `/api/local-data` and renders a price chart + small stats
+The application uses a three-tab shell layout with consistent navigation.
 
-- `/backtester`
-    - Textarea for prompt → `/api/strategy/generate` → DSL JSON
-    - Allows manual DSL editing
-    - Runs `/api/strategy/run`, shows equity curve, trades, metrics
+### Shell Layout (`app/(shell)/layout.tsx`)
+- Provides persistent top navigation with three tabs: Dashboard, Strategy Lab, Data Warehouse
+- Uses Next.js App Router with proper client-side routing
+- Maintains active tab highlighting and consistent theme
 
-- `/data-explorer`
-    - Lists all tickers from manifest
-    - Optional filters (sector/industry) if present in manifest metadata
+### Dashboard (`/dashboard`)
+- **Multi-ticker selection**: Full-row highlight selection with search filtering
+- **Eye icon navigation**: Click eye icon to deep-link to Data Warehouse (`/explore?symbol=TICKER`)
+- **Isolate action**: Context menu to focus on single ticker
+- **Indicator configuration**: Toggle SMA/EMA with editable periods (defaults: SMA 50, EMA 20), RSI (14), MACD (12,26,9)
+- **Auto date range**: Computes min/max dates from selected tickers' data spans
+- **Strategy handoff**: "Create a strategy with this" button stores context in Zustand and navigates to Strategy Lab
 
-## 7. Scripts
+### Strategy Lab (`/strategy`)
+- **Server→Client pattern**: Server component parses searchParams, passes to StrategyClient in Suspense
+- **Prefill support**: Accepts tickers, indicators, start/end from URL params or Zustand store fallback
+- **Sector selection**: Multi-select sectors auto-populate ticker selection (if sector mapping available)
+- **AI generation**: Natural language prompt → DSL via `/api/strategy/generate`
+- **Backtest execution**: DSL → results via `/api/strategy/run`
+- **Standalone operation**: Works independently when accessed directly
+
+### Data Warehouse (`/explore`)
+- **Index view**: Comprehensive ticker catalog with search, sector filtering, date filtering, sortable columns
+- **Symbol pages**: Deep-link support (`/explore?symbol=AAPL`) shows detailed ticker view with price chart
+- **Metadata exploration**: Records count, date ranges, file formats, sector/industry classifications
+- **Statistics dashboard**: Total tickers, data coverage, average records per ticker
+
+## 7. Implementation Notes
+
+### Chart Readability & Performance
+- **Series management**: Legend click to hide/show individual tickers; hover for visual emphasis (opacity changes)
+- **Multi-scale support**:
+  - Price (absolute): Default mode showing actual price values
+  - Indexed %: Normalize all series to 100 at start date, show percentage change
+  - Small multiples: Grid of mini-charts (limit 6 by default, "Show all" toggle for more)
+- **Indicator panels**: RSI and MACD rendered in separate sub-panels below main chart to prevent mixed scales
+- **Reference lines**: RSI 30/70 levels, MACD zero line for visual analysis
+- **Performance optimization**: Automatic downsampling when > 5k total points using largest triangle three buckets algorithm
+- **Error boundaries**: Graceful handling when selected symbols have no data in chosen date window
+
+### Sector Mapping Fallback Logic
+1. Check if manifest items include `sector` field → use directly
+2. Else, attempt to load `public/sectors.json` → map symbols to sectors
+3. Else, check `lib/metadata/sectors.ts` for static mapping
+4. If no mapping found, hide sector UI completely (no console errors)
+
+### Next.js App Router Conventions
+- **Page export restrictions**: Only allowed exports: `default`, `generateMetadata`, `generateStaticParams`, `revalidate`, `dynamic`, `dynamicParams`, `fetchCache`, `runtime`, `preferredRegion`, `maxDuration`, `metadata`
+- **Helper functions**: Must be moved to `utils.ts` files in same directory, not exported from pages
+- **Suspense boundaries**: Any component using `useSearchParams` must be client component under Suspense; prefer passing values from server page
+- **Server/Client boundary**: Clear separation with server components handling data fetching, client components handling interactivity
+
+### Global State Management
+- **Zustand store**: `app/store/strategyStore.ts` manages strategy handoff between Dashboard and Strategy Lab
+- **Handoff flow**: Dashboard → `setStrategy()` → `router.push('/strategy')` → Strategy Lab reads from store if URL params absent
+- **State shape**: `{ tickers: string[], indicators: string[], start?: string, end?: string }`
+
+## 8. Scripts
 
 - `scripts/build-manifest.ts`
     - Scans `s3://AWS_BUCKET/AWS_PREFIX/` for ticker files
     - Writes `index.json` back into the prefix (no ACLs; compatible with Object Ownership: Bucket owner enforced)
     - Re-run whenever adding more Parquet datasets
 
-## 8. Environment & Deployment
+- `scripts/check-page-exports.js`
+    - Validates that all `app/**/page.tsx` files only export allowed Next.js exports
+    - Prevents build failures due to invalid named exports from page files
+    - Run via `npm run check-page-exports` or directly with Node
+
+## 9. Environment & Deployment
 
 Local: `.env.local` (already present; keep unchanged)
 
@@ -158,7 +209,7 @@ Vercel:
 - Add the same vars in Project Settings → Environment Variables (Production + Preview)
 - APIs must run on Node runtime (already configured)
 
-## 9. Current Status / Known Issues
+## 10. Current Status / Known Issues
 
 - S3 manifest + data loading works for AAPL and most tickers
 - Flat-line at 0 for some tickers (e.g., ABBV):
@@ -168,7 +219,7 @@ Vercel:
     - Fix by re-saving files as UTF-8 LF and adding `.gitattributes` (`* text=auto eol=lf`)
 - ML strategies: scaffold present; execution disabled in serverless paths; integrate Python service when ready
 
-## 10. Operability (Runbooks)
+## 11. Operability (Runbooks)
 
 Regenerate manifest:
 

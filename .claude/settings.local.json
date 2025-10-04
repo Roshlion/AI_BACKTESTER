@@ -8,7 +8,12 @@
       "Bash(npm run build:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npm run lint)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm install:*)",
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(npm ci:*)"
     ],
     "deny": [],
     "ask": []
