@@ -12,17 +12,25 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 import ta
+import os
 
 app = FastAPI(title="AI Backtester ML Service", version="1.0.0")
 
-# Enable CORS
+# Configure CORS from environment variable
+origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=origins if origins != ["*"] else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# S3 Configuration (for production use)
+DATA_BUCKET = os.getenv("DATA_BUCKET", "ai-backtester-data-rosh")
+DATA_PREFIX = os.getenv("DATA_PREFIX", "prod/")
+DATA_LAYOUT = os.getenv("DATA_LAYOUT", "per-symbol")
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 
 # Request/Response models
@@ -73,7 +81,16 @@ class TrainPredictResponse(BaseModel):
 @app.get("/health")
 async def health():
     """Health check endpoint"""
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "service": "ml",
+        "config": {
+            "data_bucket": DATA_BUCKET,
+            "data_prefix": DATA_PREFIX,
+            "data_layout": DATA_LAYOUT,
+            "aws_region": AWS_REGION
+        }
+    }
 
 
 @app.post("/ml/generate", response_model=GenerateResponse)
