@@ -235,6 +235,7 @@ export default function DashboardClient() {
                   {filteredTickers.map((ticker) => (
                     <div
                       key={ticker.ticker}
+                      data-row={`ticker-${ticker.ticker}`}
                       className={`relative flex items-center p-3 rounded cursor-pointer transition-colors ${
                         selectedTickers.includes(ticker.ticker)
                           ? "bg-blue-600/30 border border-blue-500/50"
@@ -256,8 +257,9 @@ export default function DashboardClient() {
                         <button
                           onClick={() => handleEyeClick(ticker.ticker)}
                           className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
-                          title="Open in Data Warehouse"
-                          aria-label="Open in Data Warehouse"
+                          title={`Open ${ticker.ticker} in Data Warehouse`}
+                          aria-label={`Open ${ticker.ticker} in Data Warehouse`}
+                          data-testid={`eye-${ticker.ticker}`}
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -273,8 +275,9 @@ export default function DashboardClient() {
                             <button
                               onClick={() => handleIsolate(ticker.ticker)}
                               className="block w-full text-left px-3 py-2 text-sm text-white hover:bg-gray-600"
-                              title="Isolate this ticker"
-                              aria-label="Isolate this ticker"
+                              title={`Isolate ${ticker.ticker}`}
+                              aria-label={`Isolate ${ticker.ticker}`}
+                              data-testid={`isolate-${ticker.ticker}`}
                             >
                               Isolate
                             </button>

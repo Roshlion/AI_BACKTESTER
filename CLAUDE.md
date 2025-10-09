@@ -1,398 +1,475 @@
-TITLE: Rebuild AI_BACKTESTER from main into a three-tab shell (Dashboard / Strategy Lab / Data Warehouse), fix selection & navigation, add sector selection (Strategy Lab only), de-clutter multi-ticker charts, replace “only” with eye link, and clean code/docs/tests
+Here’s your **full CLAUDE PROMPT** (raw text). Paste it into Claude and run it on the **FeatureComponent** branch.
 
-SOURCE OF TRUTH:
+---
 
-Start from the current main branch. Create a new feature branch and apply ALL instructions below.
+TITLE: Finish 3-tab app, fix tests, re-integrate Strategy Builder into Strategy Lab (DSL + ML), add ML backend client + AWS deploy path, clean repo, and add agents.md
 
-Remove any changes that created intermediate/standalone “strategy” pages outside the main shell.
+SCOPE / BRANCH:
 
-Keep the visual style as it is today (dark theme, typography, paddings), but integrate the chart readability improvements.
+* Work ONLY on branch `FeatureComponent`. Do NOT touch `main` or create new branches.
+* Keep the 3 tabs: Dashboard (default), Strategy Lab, Data Warehouse.
+* Fix failing tests, reintroduce the Strategy Builder UX into Strategy Lab (including example prompts + “How it works”), integrate ML flow with an external Python service (config-gated), clean unused code, and update docs.
+* When done: run tests, typecheck, build, commit, push.
 
-GOALS (must all be met):
+---
 
-Single application shell with three tabs at the top: “Dashboard” (default), “Strategy Lab”, “Data Warehouse”.
+## A) TEST FAILURES (fix first)
 
-Dashboard keeps full-row multi-select, but the right-side “only” text is replaced with a subtle eye icon that links to the symbol’s page in the Data Warehouse tab (deep link).
+Root cause: queries find multiple elements (duplicate aria-labels or roles).
 
-“Create a strategy with this” switches to Strategy Lab in-place (same shell), prefilled with tickers/indicators/dates. No intermediate standalone page.
+1. In the ticker row component used on Dashboard:
 
-Charts remain readable with many tickers (see “Chart readability & performance”).
+   * Make labels/testids symbol-specific.
 
-Sector selection is implemented in Strategy Lab only (multi-select sectors → expands to tickers). If sector metadata is unavailable, hide the control automatically.
+     * Eye icon (Data Warehouse link): aria-label = `Open ${symbol} in Data Warehouse`, data-testid = `eye-${symbol}`.
+     * Isolate action: aria-label = `Isolate ${symbol}`, data-testid = `isolate-${symbol}`.
+   * Add a data attribute on the row wrapper: `data-row="ticker-${symbol}"`.
 
-Fix any Next.js App Router issues: server/client boundaries, allowed page exports, Suspense usage, dynamic rendering flags.
+2. Textareas in Strategy Lab:
 
-Remove “Quick Links” on Dashboard; the three top tabs are the only nav.
+   * Prompt textarea: `aria-label="Strategy Description"`.
+   * DSL textarea: `aria-label="DSL Code"`.
 
-Clean codebase (remove obsolete exports/components), update README and DOCUMENTATION, add regression tests.
+3. Update tests accordingly:
 
-APP SHELL & ROUTING (Next.js App Router)
+   * In `tests/dashboard-select.test.tsx`: query **within the AAPL row** or use testids:
 
-Create a shared tabbed layout under app/(shell)/layout.tsx. It renders a top nav with three tabs:
+     * `const row = screen.getByText('AAPL').closest('[data-row="ticker-AAPL"]')`
+     * `within(row!).getByTestId('eye-AAPL')`
+     * `within(row!).getByTestId('isolate-AAPL')`
+   * In `tests/dashboard-to-strategy-handoff.test.tsx`:
 
-/dashboard (label: Dashboard)
+     * `getByLabelText('Strategy Description')` for the prompt.
+     * If needed elsewhere: `getByLabelText('DSL Code')`.
+   * Ensure queries are specific (no `getByRole('textbox')` unless there’s only one).
 
-/strategy (label: Strategy Lab)
+Run:
 
-/explore (label: Data Warehouse)
-The active tab is visually highlighted. Keep styling consistent with current theme.
+* `npm run test` (iterate until all green).
 
-Move pages under this layout:
+---
 
-Dashboard: app/(shell)/dashboard/page.tsx
+## B) APP SHELL (keep as-is)
 
-Strategy: app/(shell)/strategy/page.tsx (server component that passes props to a client child)
+* Keep the shared layout `app/(shell)/layout.tsx` with tabs:
 
-Explore: app/(shell)/explore/page.tsx
+  * `/dashboard` label “Dashboard”
+  * `/strategy` label “Strategy Lab”
+  * `/explore` label “Data Warehouse”
+* No “Quick Links”. Tabs are the only navigation.
 
-Allowed page exports only. For every app/**/page.tsx, allow only: default, generateMetadata, generateStaticParams, revalidate, dynamic, dynamicParams, fetchCache, runtime, preferredRegion, maxDuration, metadata. No other named exports from page files. Move helpers to sibling utils.ts.
+---
 
-Strategy page boundary pattern (must use this):
+## C) DASHBOARD (minor confirmations)
 
-app/(shell)/strategy/page.tsx is a Server Component:
+* Keep full-row multi-select with row highlight (no checkboxes).
+* Search filters the list; max-height + scroll; show “No tickers found” when empty.
+* Right side controls per row:
 
-export const dynamic = 'force-dynamic'
+  * Eye icon → `Link` to `/explore?symbol=<SYMBOL>` (does not toggle selection).
+  * Three-dot menu with “Isolate this ticker” (sets selected = [SYMBOL] only).
+* Indicators:
 
-export const revalidate = 0
+  * SMA/EMA toggles with double-click numeric input (defaults: SMA 50, EMA 20).
+  * RSI(14), MACD(12/26/9) fixed.
+* Dates:
 
-Receives searchParams and passes parsed values to a client component StrategyClient wrapped in <Suspense>.
+  * Auto-fill Start/End = min/max across selected tickers.
+  * Manual edits respected; “Reset range” restores full span.
+* Handoff:
 
-StrategyClient.tsx is a Client Component that renders the Strategy Lab UI.
+  * On “Create a strategy with this”: write `{tickers, indicators, start, end}` to Zustand store, `router.push('/strategy')` (no intermediate pages).
 
-If URL search params are missing, StrategyClient initializes from a global store (see “Global state” below).
+---
 
-GLOBAL STATE (handoff without page reloads)
+## D) STRATEGY LAB — reintroduce Strategy Builder UX (DSL + ML)
 
-Use Zustand (or React Context if preferred). Create app/store/strategyStore.ts:
+Goal: Bring the `/backtester` “Strategy Builder” UI into the **Strategy Lab** tab and keep it feature-complete.
 
-shape:
+1. Structure:
 
-tickers: string[]
+   * Keep server→client split:
 
-indicators: string[] // e.g., ["SMA50","EMA20","RSI","MACD"]
+     * `app/(shell)/strategy/page.tsx` (Server): `dynamic='force-dynamic'`, `revalidate=0`, parse `searchParams`, pass to client inside `<Suspense>`.
+     * `app/(shell)/strategy/StrategyClient.tsx` (Client): renders everything below.
+   * Prefill order:
 
-start?: string // YYYY-MM-DD
+     * If `searchParams` present → use them.
+     * Else if Zustand store has a payload from Dashboard → use it.
+     * Else → empty defaults.
 
-end?: string // YYYY-MM-DD
+2. Strategy Builder UI inside StrategyClient:
 
-setStrategy(data)
+   * “Strategy Type” toggle with two modes:
 
-clearStrategy()
+     * Rule-Based (DSL)
+     * Machine Learning
+   * Keep the original **example prompts** (short list) and the **“How it works”** panel at the bottom. Do not remove any content that tests reference. If you still have `/backtester` code for examples and descriptions, **move** it into StrategyClient (or a child component) and **delete** `/backtester` page after migration.
+   * Inputs row: tickers (comma-separated or multi-select chips), Start Date, End Date.
+   * Buttons:
 
-Dashboard:
+     * “Generate DSL” (for Rule-Based)
+     * “Generate & Test Strategy” (for ML mode) — see ML flow below.
+   * Textareas:
 
-On “Create a strategy with this”, call setStrategy({ tickers, indicators, start, end }), then router.push('/strategy').
+     * Strategy Description (aria-label as above) — hint/autofill from Dashboard indicators: e.g., “Use SMA(50), EMA(20), RSI…”
+     * DSL Code (aria-label as above)
 
-Do not navigate to any other route.
+3. Sector selection (Strategy Lab only):
 
-Strategy Lab:
+   * If a sector mapping exists (field `sector` on manifest, `public/sectors.json`, or `lib/metadata/sectors.ts`), show a collapsible “Filter by sector” with multi-select; selecting sectors unions their tickers into selection; deselecting removes them (unless manually re-added).
+   * If mapping not found, hide the control.
 
-On mount, read from URL (if present) else from store.
+4. Keep the existing backtest flow:
 
-Prefill ticker multi-select, indicator toggles/periods, and optional date range.
+   * Rule-Based:
 
-Prefill prompt with a friendly hint from indicators (e.g., “Strategy idea: Use SMA(50) and RSI…”). Singularize if one indicator.
+     * “Generate DSL” → call `/api/strategy/generate?mode=dsl` with the description; render DSL into the DSL textarea.
+     * “Run backtest” → call existing `/api/strategy/run` with `{dsl, tickers, start, end}`.
+   * ML Mode: see next section.
 
-Explore/Data Warehouse:
+---
 
-If ?symbol=XYZ is present, focus the symbol’s page.
+## E) ML INTEGRATION — UI + server proxy (config gated)
 
-DASHBOARD (selection, eye link, search, dates, indicators)
+Objective: ML mode that (1) generates a baseline model config and editable hyperparameters from the user’s natural language strategy, then (2) trains/predicts with the selected data.
 
-Ticker list:
+1. UI flow (ML mode in StrategyClient):
 
-Keep full-row multi-select highlight. No visible checkboxes.
+   * Step 1: user writes an ML description (or it’s prefilled from Dashboard context).
+   * Step 2: on “Generate & Test Strategy”:
 
-Each row shows the ticker symbol (left). On the far right, replace the “only” text with a small eye icon button (e.g., 👁). On hover: tooltip “Open in Data Warehouse”. Clicking the eye navigates to /explore?symbol=<TICKER>. This must NOT toggle selection.
+     * POST to `/api/strategy/generate?mode=ml` with `{description, tickers, start, end}`.
+     * Expect response: `{ code: string, hyperparams: object, uiSchema: object, modelType: string }`.
 
-Keep an isolate action, but move it to row context menu (three-dot menu) or a subtle icon separate from the eye (e.g., ⬤). Tooltip: “Isolate this ticker”. Clicking isolate sets selectedTickers=[symbol].
+       * `code`: python function or pipeline template (read-only display).
+       * `hyperparams`: editable key/values (e.g., n_estimators, window, test_size).
+       * `uiSchema`: simple schema telling the UI how to render fields (number, select, min/max, help).
+     * Render an editable **Hyperparams** panel from `uiSchema`.
+   * Step 3: on “Run ML”:
 
-Search:
+     * POST `/api/strategy/run` with `{mode: 'ml', tickers, start, end, code, hyperparams}`.
+     * Display metrics and prediction plots on return.
 
-Text input filters the list as the user types (case-insensitive, starts-with or contains). If no matches, show “No tickers found”.
+2. Next.js API behavior:
 
-Do NOT expand to a giant dropdown that reveals all 100+ tickers; the list stays scrollable with a fixed max height (e.g., 22rem).
+   * Create/extend `lib/ml-client.ts` to call an external service at `process.env.ML_API_URL`.
 
-Indicators:
+     * `generate({description, tickers, start, end})` → `POST /ml/generate` on Python service.
+     * `trainPredict({tickers, start, end, code, hyperparams})` → `POST /ml/run`.
+   * In `/api/strategy/generate`:
 
-Toggles: SMA, EMA, RSI, MACD. Double-click SMA/EMA toggles to open a small inline numeric input for period (defaults: SMA 50, EMA 20). RSI 14 and MACD 12/26/9 are constants (not user-editable for now).
+     * If `mode === 'ml'`:
 
-Persist chosen periods in Dashboard state so the handoff includes SMA50/EMA20 format in indicators.
+       * If `ML_API_URL` set → call `mlClient.generate`.
+       * Else if `ALLOW_LOCAL_PY=1` AND `process.env.NODE_ENV !== 'production'` → fallback local exec via `child_process` (python) in dev only.
+       * Else → return 501 with message “ML disabled; set ML_API_URL”.
+   * In `/api/strategy/run`:
 
-Dates:
+     * If `mode === 'ml'` → proxy to `mlClient.trainPredict` (or local dev fallback as above).
 
-When the first ticker is selected, auto compute start/end from the union of available data (min date across selected, max date across selected). Fill Start/End inputs with YYYY-MM-DD.
+3. UI gating:
 
-If the user edits dates, honor them; provide a “Reset range” button to revert to full span.
+   * Show the **ML option** only if either:
 
-“Create a strategy with this”:
+     * `process.env.ML_API_URL` is defined, OR
+     * `ALLOW_LOCAL_PY=1` in dev.
+   * Otherwise show a small note: “ML unavailable: set ML_API_URL”.
 
-Button on the Dashboard panel. On click:
+---
 
-Build the indicators list like ["SMA50","EMA20","RSI","MACD"] based on toggles and periods.
+## F) PYTHON SERVICE (external) — scaffold + endpoints
 
-Call strategyStore.setStrategy({ tickers, indicators, start, end }).
+Create a sibling folder in this repo: `services/ml` (may push to its own repo later).
 
-router.push('/strategy'). No other pages. No standalone DSL route.
+Files:
 
-STRATEGY LAB (prefill, sectors, workflow)
+* `services/ml/app/main.py` (FastAPI)
+* `services/ml/requirements.txt` (fastapi uvicorn scikit-learn pandas numpy ta prophet orstatsmodels joblib pydantic)
+* `services/ml/Dockerfile`
+* `services/ml/README.md`
 
-Prefill logic:
+FastAPI endpoints (minimal viable):
 
-Strategy page server component parses searchParams (tickers, indicators, start, end) and passes them to StrategyClient. If params are absent, StrategyClient pulls from strategyStore. If both absent, show empty/default.
+* `GET /health` → `{status:'ok'}`
+* `POST /ml/generate` (accept `{description, tickers, start, end}`):
 
-StrategyClient:
+  * Return baseline:
 
-Prefill tickers multi-select (list from manifest).
+    ```
+    {
+      "modelType": "RandomForestRegressor",
+      "code": "# python template that trains RF on features",
+      "hyperparams": { "n_estimators": 200, "max_depth": 8, "window": 60, "test_size": 0.2, "random_state": 42 },
+      "uiSchema": {
+        "n_estimators": { "type":"number", "min":50, "max":1000, "step":50, "help":"Number of trees" },
+        "max_depth": { "type":"number", "min":2, "max":30, "step":1 },
+        "window": { "type":"number", "min":5, "max":250, "step":5, "help":"Feature lookback window (days)" },
+        "test_size": { "type":"number", "min":0.1, "max":0.5, "step":0.05 },
+        "random_state": { "type":"number", "min":0, "max":9999, "step":1 }
+      }
+    }
+    ```
+* `POST /ml/run` (accept `{tickers, start, end, code, hyperparams}`):
 
-Prefill prompt using indicators (convert “SMA50” to “SMA(50)” for readability).
+  * Build features from OHLC (close/returns, rolling means, RSI/MACD via `ta`), split train/test via `test_size`, train the model from `code` (or template switch on `modelType`), return:
 
-Optional: prefill date inputs if provided.
+    ```
+    {
+      "metrics": { "rmse": ..., "mape": ... },
+      "predictions": [{ "date":"YYYY-MM-DD", "y":..., "yhat":... }, ...]
+    }
+    ```
+  * Keep runtime < 20–30s. Use downsampling and small defaults.
 
-Sector selection (Strategy Lab only):
+CORS: enable `origins=['*']` (or Vercel domain) for now.
 
-Add a collapsible “Filter by sector” panel above the tickers list:
+Dockerfile (slim):
 
-Multi-select control listing sectors (Technology, Healthcare, Financials, etc.).
+* `python:3.11-slim`, install requirements, `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
 
-When sectors are selected, the tickers list auto-selects all symbols belonging to those sectors (in addition to any manual selections). Deselecting a sector removes its symbols from selection (unless user explicitly re-added them).
+---
 
-Data source for sector mapping (choose the first that exists; fall back gracefully):
-a) If manifest already includes sector on each ticker, use it directly.
-b) Else, add public/sectors.json with shape { "AAPL": "Technology", "ABBV": "Healthcare", ... }.
-c) Else, check lib/metadata/sectors.ts (optional static map).
+## G) AWS DEPLOY OPTIONS FOR THE PYTHON SERVICE (pick one)
 
-If no sector mapping is found at runtime, hide the sector UI completely.
+Option 1 — **AWS App Runner** (simplest managed containers):
 
-Workflow in Strategy Lab:
+1. Create ECR repo; build/push image:
 
-Sections:
+   * `docker build -t ml-service:latest services/ml`
+   * `aws ecr get-login-password ... | docker login ...`
+   * `docker tag ml-service:latest <account>.dkr.ecr.<region>.amazonaws.com/ml-service:latest`
+   * `docker push <account>.dkr.ecr.<region>.amazonaws.com/ml-service:latest`
+2. App Runner: “Create service” → from ECR → set port 8000 → envs if needed → auto HTTPS.
+3. Copy service URL → set `ML_API_URL` in Vercel.
 
-Selected tickers (chips, removable).
+Option 2 — **AWS Lambda + API Gateway** (cold starts; OK if light):
 
-Sector filter (if available).
+* Swap uvicorn for `Mangum` in FastAPI (`handler = Mangum(app)`), package as container image to ECR, create Lambda from image, add HTTP API via API Gateway, map to `/`, set timeout/memory (e.g., 2–3GB, 20–29s), enable CORS, set `ML_API_URL` to the API Gateway URL.
 
-Backtest window (start/end inputs).
+Option 3 — **ECS Fargate + ALB** (more control, more setup):
 
-Strategy prompt textarea (pre-filled hint if indicators set).
+* Task definition from ECR image, service behind an ALB, target group port 8000, security group open 80/443, set desired count 1–2. Use ALB DNS as `ML_API_URL`.
 
-Generate DSL button (calls existing API).
+Non-AWS easy alternatives (if you prefer): Render, Railway, Fly.io — deploy Docker, grab public URL, set `ML_API_URL`.
 
-DSL editor (shows generated JSON; allow user edits).
+---
 
-Run backtest button (existing API).
+## H) FRONTEND: show ML mode hints and “How it works”
 
-Results (existing charts/tables).
+* In Strategy Lab, beneath the Builder, render:
 
-Strategy Lab must continue to work when opened directly without prior Dashboard interaction.
+  * Example prompts (DSL-oriented + ML-oriented) — revive from the `/backtester` version.
+  * “How it works” box with short explanations for both modes (DSL and ML).
+* Keep texts short; ensure tests don’t depend on exact wording (unless they already do).
 
-DATA WAREHOUSE (Explore)
+---
 
-/explore displays symbol-level pages.
+## I) CHART READABILITY (confirm it stays)
 
-If ?symbol=XYZ, show the symbol’s summary: recent price chart (single ticker), basic stats, link back to Dashboard pre-selecting that symbol (optional).
+* Legend click: toggle series visibility.
+* Legend hover: emphasize series (opacity others to ~0.3).
+* Modes: Price (default), Indexed %, Small multiples (first 6 by default, “Show all” toggle).
+* RSI/MACD in subpanels with reference lines.
+* Basic downsampling when points > threshold.
 
-If no symbol provided, show an index of available datasets with a search.
+---
 
-CHART READABILITY & PERFORMANCE (multi-ticker)
+## J) CLEANUP
 
-Implement ALL of the following (they are complementary):
+* Delete `/backtester` page after you’ve migrated its Builder UI into Strategy Lab (but keep any shared components you reused).
+* Remove any invalid named exports from `page.tsx` files; move helpers to `utils.ts`.
+* Remove unused components/assets/scripts.
+* Keep only: `(shell)/dashboard`, `(shell)/strategy`, `(shell)/explore`, APIs, libs, components, tests, and the new `lib/ml-client.ts`.
+* If you added `public/sectors.json` for mapping, keep it; hide sector UI if not present.
 
-A) Series management
+---
 
-Allow toggling visibility per ticker via legend click (hide/show series).
+## K) ENV & CONFIG
 
-On hover over legend item, temporarily emphasize that series (increase stroke width to 3 and reduce others’ opacity to ~0.3).
+* Add to `.env.local.example`:
 
-Limit line strokeWidth to 2 for prices, 1 for indicators. Use dashed/dotted for indicators.
+  ```
+  ML_API_URL=
+  ALLOW_LOCAL_PY=0
+  ```
+* In dev you can set `ALLOW_LOCAL_PY=1` to enable local python fallback (child_process) if you implement it. For production on Vercel, rely on `ML_API_URL`.
 
-Use a distinct color palette with sufficient contrast; recycle colors predictably if >10 tickers.
+---
 
-B) Normalization options
+## L) DOCS
 
-Add a “Scale” control with three modes:
+Update README.md (concise):
 
-Price (absolute) — default.
+* 3 tabs (Dashboard, Strategy Lab, Data Warehouse).
+* Dashboard: multi-select rows, eye→Explore, isolate action, indicators with editable SMA/EMA, auto min/max dates, “Create a strategy with this”.
+* Strategy Lab: Builder (DSL + ML), example prompts, “How it works”, sector multi-select (if available), prefill from URL/store, generate DSL or ML, run backtest.
+* Data Warehouse: `/explore?symbol=XYZ`.
+* ML: set `ML_API_URL` to enable ML mode; optional local dev fallback with `ALLOW_LOCAL_PY`.
+* Next.js notes: page export limits; server→client boundary; Suspense rules.
+* Quick start commands and env setup.
 
-Indexed % (normalize all series to 100 at start date, plot as % change).
+Update DOCUMENTATION.md (more detail):
 
-Small multiples (render each ticker in its own mini-panel with shared X axis; limit to first N=6 by default; show a notice if more are selected and provide a “Show all” toggle).
+* Strategy Builder schema (DSL and ML).
+* `ml-client` API contract (generate/run payloads).
+* Sector mapping fallback order.
+* Chart modes and performance notes.
+* Deployment notes for Python service (App Runner/Lambda/ECS).
+* Test conventions (symbol-specific aria/testids, textarea labels).
 
-Persist chosen scale in Dashboard handoff; Strategy Lab doesn’t need this value, but keep internally if you reuse its chart.
+Add `agents.md` (new file) — living doc for ML agents:
 
-C) Indicator panels
+* Sections:
 
-Keep RSI and MACD in separate sub-panels below the main price chart (prevents mixed scales). Draw RSI reference lines at 30/70; draw MACD zero line.
+  1. Purpose & scope of ML agent.
+  2. Data sources available (OHLC + indicators; where fetched; shapes).
+  3. Current ML endpoints (generate/run payloads, expected responses).
+  4. Current model templates supported (e.g., RandomForestRegressor; planned: XGBoost, Prophet).
+  5. Feature engineering currently applied (returns, rolling means, RSI/MACD).
+  6. Hyperparameter schema and defaults; UI schema rules.
+  7. Evaluation metrics we compute and return (RMSE, MAPE; add others later).
+  8. Known limits (runtime ceilings, downsampling).
+  9. Deployment pointers (where ML_API_URL points; region; scaling).
+  10. Next iteration TODOs.
+* Ensure `agents.md` is updated whenever the ML flow changes.
 
-D) Downsampling and windowing
+---
 
-For performance, downsample points when > 5k total points on the canvas (e.g., largest triangle three buckets or simple thinning). Only for rendering; keep raw data for tooltips if feasible.
+## M) COMMANDS TO RUN (Claude)
 
-When date range narrows, re-use full-resolution data.
+1. Install, test, typecheck, build:
 
-E) Error boundaries
+   ```
+   npm ci
+   npm run test
+   npm run typecheck
+   npm run build
+   ```
 
-Guard against empty series: if a selected symbol has no data in the chosen date window, show a non-blocking inline message and skip plotting it.
+   Fix any failures and re-run until green.
 
-UI/UX CONSISTENCY & ACCESSIBILITY
+2. Commit and push:
 
-Keep current font sizes, paddings, and card styles.
+   ```
+   git add -A
+   git commit -m "feat(strategy): integrate Strategy Builder (DSL+ML) in Strategy Lab; ML client + gating; tests fixed; charts; sectors; cleanup; docs; agents.md"
+   git push -u origin FeatureComponent
+   ```
 
-On mobile (< md), stack columns; ensure the top tabs remain visible. No overlapping floating widgets; if any floating tool exists, lower z-index on mobile or hide it.
+---
 
-Provide keyboard support for ticker list (Enter/Space toggle), isolate icon (Enter activates), eye icon (Enter opens Data Warehouse).
+AFTER CLAUDE PUSHES, DO THIS LOCALLY:
 
-Add aria-label for the eye icon (“Open in Data Warehouse”), isolate icon (“Isolate this ticker”), and strategy button (“Create a strategy with selected tickers”).
+```
+git fetch origin
+git switch FeatureComponent
+git pull --ff-only origin FeatureComponent
+npm ci
+npm run dev
+```
 
-FILE ORGANIZATION & CLEANUP
+Smoke test tabs, Strategy Builder (both modes), sector filter, charts, and eye/isolate actions. When satisfied, open a PR `FeatureComponent → main`.
 
-New/Updated:
-app/(shell)/layout.tsx
-app/(shell)/dashboard/page.tsx
-app/(shell)/dashboard/DashboardClient.tsx
-app/(shell)/dashboard/utils.ts // helpers like formatIndicators, computeMinMaxDates
-app/(shell)/strategy/page.tsx // server
-app/(shell)/strategy/StrategyClient.tsx
-app/(shell)/explore/page.tsx
-app/store/strategyStore.ts
-public/sectors.json // only if needed
-lib/indicators.ts // SMA/EMA/RSI/MACD computations
-lib/colors.ts // color palette + recycling
-lib/downsample.ts // optional downsampling util
-components/Chart/* // shared chart components (main + RSI + MACD + small multiples)
+---
 
-Delete or refactor:
+INTEGRATING THE ML SERVICE (AWS quick picks):
 
-Any standalone “strategy” pages created outside (shell) or that bypass the tabs.
+Option A (easiest AWS): App Runner
 
-Any page.tsx named exports not in the allowed list (move to utils.ts).
+* Build/push Docker from `services/ml`.
+* Create App Runner service from ECR image (port 8000).
+* Set `ML_API_URL` on Vercel to the App Runner URL.
 
-“Quick Links” card from Dashboard; navigation is via the top tabs.
+Option B: Lambda + API Gateway
 
-Duplicated CSS/JS from earlier iterations.
+* Use FastAPI + Mangum; container to ECR; Lambda from image; HTTP API; set CORS; increase memory and timeout; set `ML_API_URL`.
 
-TYPING & SERVER/CLIENT BOUNDARY
+Either way: confirm `GET /health` returns ok, then test from your app (Strategy Lab → ML mode).
 
-All page.tsx files: only allowed exports; no helper exports.
+ADD-ON: ML “Generate → Review/Edit → Run” with visual model card and live params
 
-Strategy page: dynamic='force-dynamic', revalidate=0, server parses searchParams, passes props to client within <Suspense>.
+Two-step flow (mirrors DSL):
 
-If any component uses useSearchParams, it must be a client component and rendered under a Suspense boundary; prefer passing values from the server page instead.
+Step 1: Generate ML → POST /api/strategy/generate?mode=ml with {description, tickers, start, end}.
+Response MUST include:
 
-INDICATOR CALCULATIONS (client-side)
+{
+  modelType: string,               // e.g., "RandomForestRegressor"
+  summary: { purpose, notes? },    // short description for the card
+  codeTemplate: string,            // python template with tokens like {{n_estimators}}
+  hyperparams: { key: value, ...}, // defaults
+  uiSchema: { key: {type,min,max,step,options?,help?}, ...}
+}
 
-SMA(N): simple moving average over close.
 
-EMA(N): alpha = 2/(N+1), seed with first value or SMA of first N.
+Step 2: Review/Edit (before running):
 
-RSI(14): Wilder’s smoothing; bounds [0,100]; render reference lines at 30/70.
+Show a Model Card with modelType + summary.
 
-MACD: fast=12 EMA, slow=26 EMA, macd=fast−slow; signal=EMA9(macd). Plot macd and signal lines; skip histogram to reduce clutter with many tickers.
+Render Hyperparameter Form from uiSchema.
 
-SECTOR MAPPING (Strategy Lab only)
+Show Python Code pane generated from codeTemplate with current hyperparams (see templating below).
 
-Lookup order:
+Changes in the form live-update the code pane.
 
-If manifest items have sector field: use it.
+Step 3: Run ML → POST /api/strategy/run with:
 
-Else, if public/sectors.json exists, load it and map symbols to sectors.
+{
+  mode: "ml",
+  tickers, start, end,
+  modelType,
+  hyperparams,               // final edited values
+  code: renderedCode         // result of templating with current hyperparams
+}
 
-Else, hide sector UI completely (no console errors).
 
-Sector multi-select behavior:
+Templating (live code update):
 
-Selecting sectors adds their tickers to the selected list (union).
+Implement a tiny, safe templater (no eval): replace {{key}} with stringified hyperparams[key].
 
-Deselecting a sector removes those tickers unless the user manually toggled them back on.
+Keep codeTemplate read-only; render to renderedCode on each param change.
 
-Show a compact count (e.g., “Tech (12)”).
+Validation: clamp to min/max/step from uiSchema; show inline errors; disable “Run ML” if invalid.
 
-Handoff:
+UI components (Strategy Lab → ML mode):
 
-When the user runs backtests, the final “selected tickers” list is what drives the request; sectors are just a convenience for selection.
+ModelCard (props: modelType, summary)
 
-TESTS (Vitest + React Testing Library; add minimal but effective coverage)
+HyperparamForm (props: hyperparams, uiSchema, onChange)
 
-pages-exports.test.ts
+CodePane (read-only textarea, aria-label="ML Code")
 
-Scan app/**/page.tsx for export const|function|class and fail if any export is not in the allowed Next.js list.
+Buttons: “Generate ML”, “Run ML”
 
-dashboard-select.test.tsx
+Gate by ML_API_URL (or ALLOW_LOCAL_PY in dev).
 
-Renders ticker list; typing in search filters the list; “No tickers found” appears when appropriate.
+Persistence & export:
 
-Clicking a row toggles highlight; clicking isolate sets exactly one ticker selected.
+Allow Download of current ML spec: {modelType, hyperparams, renderedCode} as JSON + .py.
 
-Eye icon opens /explore?symbol=XYZ (mock router or check href on a Link component).
+Store the last generated spec in Zustand so navigating tabs preserves it.
 
-dashboard-to-strategy-handoff.test.tsx
+Tests (brief):
 
-With selectedTickers + indicators + dates, clicking “Create a strategy with this” updates strategyStore and calls router.push('/strategy').
+Generate → renders ModelCard, Form, CodePane.
 
-StrategyClient reads from store when searchParams absent and renders prefilled chips and prompt.
+Editing a param updates code (assert string replacement).
 
-chart-readability.test.tsx
+“Run ML” posts {renderedCode, hyperparams} (mock API).
 
-Given many tickers, legend click hides/shows a series (DOM or state assertions).
+Accessibility: aria-label="ML Code"; hyperparam inputs have labels.
 
-Hovering a legend item reduces opacity of non-focused series (class/style check).
+Files touched:
 
-Switching Scale from Price to Indexed % recomputes y-values (smoke check on transformed data).
+app/(shell)/strategy/StrategyClient.tsx (add ML mode panel).
 
-Small multiples mode renders a grid of mini-charts and shows a “Show all” toggle when more than 6 tickers are selected.
+components/strategy/ModelCard.tsx, HyperparamForm.tsx, CodePane.tsx.
 
-DOCS UPDATES
+lib/template.ts (pure replacer).
 
-README.md (add/adjust):
+API: /api/strategy/generate and /api/strategy/run (ml branches use ml-client).
 
-New three-tab navigation: Dashboard (default), Strategy Lab, Data Warehouse.
+Don’t remove:
 
-Dashboard: multi-ticker selection, eye icon to Data Warehouse, isolate action, indicator toggles with editable SMA/EMA periods, auto date range, “Create a strategy with this” switches to Strategy Lab and pre-fills context.
-
-Strategy Lab: accepts prefill from URL or store; sector selection (if data available); prompt → generate DSL → run backtest.
-
-Data Warehouse: symbol pages; deep link from eye icon.
-
-Developer notes: App Router page exports restrictions; Strategy page server→client pattern; global store handoff.
-
-DOCUMENTATION.md:
-
-Frontend Pages section describing each tab and interactions.
-
-Implementation notes: sector mapping fallback logic; chart readability controls (legend toggle, hover emphasis, normalization, small multiples); downsampling threshold; mobile responsiveness choices.
-
-Conventions: no helper exports from page files; use utils.ts; Suspense boundary for client hooks.
-
-ACCEPTANCE CRITERIA (must all pass)
-
-Top navigation shows three tabs; Dashboard is default; navigating between tabs does not leave the shell.
-
-Ticker list: full-row highlight; search filters; isolate action works; eye icon opens /explore?symbol=....
-
-“Create a strategy with this” switches to Strategy Lab in place, with tickers/indicators/dates prefilled (from store or URL).
-
-Strategy Lab works standalone (no prefill) and with prefill (store or URL).
-
-Sector multi-select appears only if mapping is available; selecting sectors updates ticker selection.
-
-Charts remain readable with many series: legend toggling, hover emphasis, normalization options, RSI/MACD in subpanels, optional small multiples.
-
-No invalid named exports from page files; build passes; typecheck passes; tests pass.
-
-Quick Links card removed from Dashboard; navigation only via tabs.
-
-Documentation updated as described.
-
-CODING NOTES
-
-Preserve current aesthetics and theme; integrate new controls subtly (no jarring style changes).
-
-Use Tailwind utility classes already present for consistency.
-
-Keep all new strings short and clear. Tooltips where needed.
-
-Make no network calls for sector mapping unless the file exists; treat missing mapping as a feature toggle.
-
-Prefer passing values from server page to client via props over reading useSearchParams in clients; if you must read URL client-side, ensure it is under a <Suspense> boundary.
-
-END OF PROMPT
+Keep “Example prompts” and “How it works” at bottom of Strategy Lab (both DSL + ML sections).

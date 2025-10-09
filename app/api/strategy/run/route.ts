@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { normaliseDsl, runBacktest, type StrategyDSL } from "@/lib/strategy-engine";
 import { readTickerRange } from "@/lib/safeParquet";
+import * as mlClient from "@/lib/ml-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,35 +79,47 @@ export async function POST(req: NextRequest) {
     const perTicker: any[] = [];
 
     if (mode === "ml") {
-      const code = body.code;
+      // Check if ML service is available
+      if (!mlClient.isMLAvailable()) {
+        return NextResponse.json({
+          ok: false,
+          error: "ML service is not available. Set ML_API_URL or ALLOW_LOCAL_PY=1 in development."
+        }, { status: 501 });
+      }
+
+      const { code, modelType, hyperparams } = body;
       if (!code || typeof code !== "string") {
-        return NextResponse.json({ ok: false, error: "code (Python) required for ML mode" }, { status: 400 });
+        return NextResponse.json({ ok: false, error: "code required for ML mode" }, { status: 400 });
+      }
+      if (!hyperparams || typeof hyperparams !== "object") {
+        return NextResponse.json({ ok: false, error: "hyperparams required for ML mode" }, { status: 400 });
       }
 
-      for (const ticker of tickers) {
-        const rows = await readTickerRange(ticker, startDate, endDate);
-        if (!rows.length) {
-          logs.push(`${ticker}: no data in range`);
-          continue;
-        }
-        const { stdout, stderr, code: exitCode } = await runPythonStrategy(code, ticker, rows);
-        if (exitCode !== 0) {
-          logs.push(`${ticker}: python exited with ${exitCode}`);
-          if (stderr) logs.push(`${ticker} stderr: ${stderr.trim()}`);
-          continue;
-        }
-        let result: any;
-        try {
-          result = JSON.parse(stdout.trim());
-        } catch (error) {
-          logs.push(`${ticker}: failed to parse python output`);
-          continue;
-        }
-        perTicker.push({ ticker, mode: "ml", result });
-      }
+      try {
+        // Call ML service for training and prediction
+        const result = await mlClient.trainPredict({
+          tickers,
+          start: startDate,
+          end: endDate,
+          modelType: modelType || "RandomForestRegressor",
+          code,
+          hyperparams,
+        });
 
-      const summary = summariseMlResults(perTicker, startDate, endDate);
-      return NextResponse.json({ ok: true, summary, perTicker, logs });
+        return NextResponse.json({
+          ok: true,
+          mode: "ml",
+          ...result,
+          tickers,
+          startDate,
+          endDate,
+        });
+      } catch (mlError) {
+        return NextResponse.json({
+          ok: false,
+          error: mlError instanceof Error ? mlError.message : "ML execution failed"
+        }, { status: 500 });
+      }
     }
 
     const dsl: StrategyDSL = body.dsl ? normaliseDsl(body.dsl) : DEFAULT_DSL;

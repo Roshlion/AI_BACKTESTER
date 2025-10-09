@@ -13,7 +13,9 @@
       "Bash(npm install:*)",
       "Bash(find:*)",
       "Bash(node:*)",
-      "Bash(npm ci:*)"
+      "Bash(npm ci:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

@@ -100,8 +100,8 @@ describe('Dashboard ticker selection', () => {
       expect(screen.getByText('AAPL')).toBeInTheDocument();
     });
 
-    // Find and click the eye icon for AAPL
-    const eyeIcon = screen.getByLabelText('Open in Data Warehouse');
+    // Find and click the eye icon for AAPL using symbol-specific testid
+    const eyeIcon = screen.getByTestId('eye-AAPL');
     fireEvent.click(eyeIcon);
 
     expect(mockPush).toHaveBeenCalledWith('/explore?symbol=AAPL');
@@ -115,21 +115,23 @@ describe('Dashboard ticker selection', () => {
     });
 
     // First select multiple tickers
-    const aaplRow = screen.getByText('AAPL').closest('div');
-    const msftRow = screen.getByText('MSFT').closest('div');
+    const aaplRow = screen.getByText('AAPL').closest('[data-row="ticker-AAPL"]');
+    const msftRow = screen.getByText('MSFT').closest('[data-row="ticker-MSFT"]');
 
     fireEvent.click(aaplRow!);
     fireEvent.click(msftRow!);
 
-    expect(screen.getByText(/2 selected/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/2 selected/)).toBeInTheDocument();
+    });
 
-    // Now isolate AAPL
-    const moreButton = screen.getAllByTitle('More actions')[0];
-    fireEvent.click(moreButton);
-
-    const isolateButton = screen.getByLabelText('Isolate this ticker');
+    // Now isolate AAPL using symbol-specific testid
+    // The button is in a dropdown that appears on hover, so we need to query it directly
+    const isolateButton = screen.getByTestId('isolate-AAPL');
     fireEvent.click(isolateButton);
 
-    expect(screen.getByText(/1 selected/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/1 selected/)).toBeInTheDocument();
+    });
   });
 });

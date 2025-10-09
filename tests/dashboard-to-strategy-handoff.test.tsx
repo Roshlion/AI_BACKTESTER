@@ -49,8 +49,8 @@ describe('Dashboard to Strategy handoff', () => {
     });
 
     // Select tickers
-    const aaplRow = screen.getByText('AAPL').closest('div');
-    const msftRow = screen.getByText('MSFT').closest('div');
+    const aaplRow = screen.getByText('AAPL').closest('[data-row="ticker-AAPL"]');
+    const msftRow = screen.getByText('MSFT').closest('[data-row="ticker-MSFT"]');
     fireEvent.click(aaplRow!);
     fireEvent.click(msftRow!);
 
@@ -100,8 +100,8 @@ describe('Dashboard to Strategy handoff', () => {
     // Check for ticker chips
     expect(screen.getByText('AAPL')).toBeInTheDocument();
 
-    // Check for strategy prompt hint
-    const promptTextarea = screen.getByRole('textbox');
+    // Check for strategy prompt hint using specific aria-label
+    const promptTextarea = screen.getByLabelText('Strategy Description');
     expect(promptTextarea).toHaveValue(expect.stringContaining('SMA(50)'));
     expect(promptTextarea).toHaveValue(expect.stringContaining('EMA(20)'));
     expect(promptTextarea).toHaveValue(expect.stringContaining('RSI'));

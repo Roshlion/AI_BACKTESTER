@@ -352,6 +352,7 @@ export default function StrategyClient({
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe your trading strategy in natural language..."
+              aria-label="Strategy Description"
               className="w-full h-32 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 resize-none"
             />
             <button
@@ -373,6 +374,7 @@ export default function StrategyClient({
               value={dslCode}
               onChange={(e) => setDslCode(e.target.value)}
               placeholder="Generated DSL will appear here, or you can write your own..."
+              aria-label="DSL Code"
               className="w-full h-64 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 font-mono text-sm resize-none"
             />
             <button

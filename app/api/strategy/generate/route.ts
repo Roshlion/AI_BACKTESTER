@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normaliseDsl, type StrategyDSL } from "@/lib/strategy-engine";
+import * as mlClient from "@/lib/ml-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,16 +103,36 @@ export async function POST(req: NextRequest) {
     }
 
     if (mode === "ml") {
-      // Generate Python code for ML strategy
-      const fullPrompt = ML_PROMPT_TEMPLATE + prompt;
-      const code = await callOpenAI(fullPrompt);
+      // Check if ML service is available
+      if (!mlClient.isMLAvailable()) {
+        return NextResponse.json({
+          ok: false,
+          error: "ML service is not available. Set ML_API_URL or ALLOW_LOCAL_PY=1 in development."
+        }, { status: 501 });
+      }
 
-      return NextResponse.json({
-        ok: true,
-        mode: "ml",
-        code: code.trim(),
-        prompt
-      });
+      // Call ML service to generate model configuration
+      try {
+        const { tickers = [], start, end } = body;
+        const mlConfig = await mlClient.generate({
+          description: prompt,
+          tickers: Array.isArray(tickers) ? tickers : [],
+          start,
+          end,
+        });
+
+        return NextResponse.json({
+          ok: true,
+          mode: "ml",
+          ...mlConfig,
+          prompt
+        });
+      } catch (mlError) {
+        return NextResponse.json({
+          ok: false,
+          error: mlError instanceof Error ? mlError.message : "ML generation failed"
+        }, { status: 500 });
+      }
     } else {
       // Generate DSL for rule-based strategy
       const fullPrompt = DSL_PROMPT_TEMPLATE + prompt;
