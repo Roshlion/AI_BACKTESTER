@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normaliseDsl, type StrategyDSL } from "@/lib/strategy-engine";
 import * as mlClient from "@/lib/ml-client";
+import type { StrategyGenerateReq } from "@/types/strategy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,8 +93,16 @@ async function callOpenAI(prompt: string): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { prompt, mode = "dsl" } = body;
+    const body: StrategyGenerateReq = await req.json().catch(() => ({}));
+    const { prompt, mode = "dsl", tickers } = body;
+
+    // Validate tickers array
+    if (!Array.isArray(tickers) || tickers.length === 0) {
+      return NextResponse.json({
+        ok: false,
+        error: "tickers array required (must have at least one ticker)"
+      }, { status: 400 });
+    }
 
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json({
@@ -113,12 +122,13 @@ export async function POST(req: NextRequest) {
 
       // Call ML service to generate model configuration
       try {
-        const { tickers = [], start, end } = body;
+        const { startDate, endDate, hyperparams } = body;
         const mlConfig = await mlClient.generate({
           description: prompt,
-          tickers: Array.isArray(tickers) ? tickers : [],
-          start,
-          end,
+          tickers,
+          start: startDate,
+          end: endDate,
+          ...(hyperparams && { hyperparams }),
         });
 
         return NextResponse.json({

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { normaliseDsl, runBacktest, type StrategyDSL } from "@/lib/strategy-engine";
 import { readTickerRange } from "@/lib/safeParquet";
 import * as mlClient from "@/lib/ml-client";
+import type { StrategyRunReq } from "@/types/strategy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,12 +67,17 @@ function summariseMlResults(perTicker: Array<{ ticker: string; result?: any }>, 
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const tickers = uniqueTickers(body.tickers ?? body.ticker);
-    if (!tickers.length) {
-      return NextResponse.json({ ok: false, error: "tickers[] required" }, { status: 400 });
+    const body: StrategyRunReq = await req.json().catch(() => ({}));
+
+    // Validate tickers array (strict)
+    if (!Array.isArray(body.tickers) || body.tickers.length === 0) {
+      return NextResponse.json({
+        ok: false,
+        error: "tickers array required (must have at least one ticker)"
+      }, { status: 400 });
     }
 
+    const tickers = uniqueTickers(body.tickers);
     const startDate = body.startDate ?? "2020-01-01";
     const endDate = body.endDate ?? new Date().toISOString().slice(0, 10);
     const mode = body.mode === "ml" ? "ml" : "dsl";
@@ -87,12 +93,12 @@ export async function POST(req: NextRequest) {
         }, { status: 501 });
       }
 
-      const { code, modelType, hyperparams } = body;
-      if (!code || typeof code !== "string") {
-        return NextResponse.json({ ok: false, error: "code required for ML mode" }, { status: 400 });
+      const { ml } = body;
+      if (!ml?.code || typeof ml.code !== "string") {
+        return NextResponse.json({ ok: false, error: "ml.code required for ML mode" }, { status: 400 });
       }
-      if (!hyperparams || typeof hyperparams !== "object") {
-        return NextResponse.json({ ok: false, error: "hyperparams required for ML mode" }, { status: 400 });
+      if (!ml.hyperparams || typeof ml.hyperparams !== "object") {
+        return NextResponse.json({ ok: false, error: "ml.hyperparams required for ML mode" }, { status: 400 });
       }
 
       try {
@@ -101,9 +107,9 @@ export async function POST(req: NextRequest) {
           tickers,
           start: startDate,
           end: endDate,
-          modelType: modelType || "RandomForestRegressor",
-          code,
-          hyperparams,
+          modelType: (ml as any).modelType || "RandomForestRegressor",
+          code: ml.code,
+          hyperparams: ml.hyperparams,
         });
 
         return NextResponse.json({

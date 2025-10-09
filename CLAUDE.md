@@ -1,422 +1,344 @@
-Here’s a single **copy-paste CLAUDE prompt** you can drop into `CLAUDE.md` on your **FeatureComponent** branch. It tells Claude exactly what to change, add, and verify—covering ML UI visibility, a health badge + health API proxy, “Example prompts” & “How it works” sections, and deep documentation (README + DOCUMENTATION.md + agents.md) with the AWS (Docker/ECR/App Runner) setup and your S3 Parquet layout.
+Here’s a single **copy-paste CLAUDE prompt** for your **FeatureComponent** branch. It folds in *everything* we discussed (DSL tickers fix, ML wiring + loading/disable, auto example prompts per mode, **Manual Checker** toggle with prefilled DSL/ML scripts, ML sector select, expanded tests incl. API + run flows, and deep docs on AWS/ECR/App Runner/S3 parquet + manifests). **Make all changes in one commit.**
 
 ---
 
-# CLAUDE.md — IMPLEMENT ML UI + HEALTH + DOCS (FeatureComponent)
+# CLAUDE.md — Final sweep: DSL tickers fix, ML Generate/Run, loading guards, Manual Checker, sectors, tests, and docs (single commit)
 
-You are working on the **FeatureComponent** branch. Apply everything below, commit in logical chunks, and keep tests green. Assume Next.js App Router, Vitest + React Testing Library, and the Python FastAPI service at `services/ml/`.
-
-## 0) Guardrails
-
-* Don’t remove anything used by tests or by the app.
-* Keep the three-tab shell (Dashboard/Strategy Lab/Data Warehouse).
-* Always render the **Strategy Lab → ML** tab (show disabled controls if ML service is offline).
-* After changes: `npm run test && npm run typecheck && npm run build`.
+You’re on branch **FeatureComponent**. Apply all changes below. Keep current style/structure (Next.js App Router, Zustand, Vitest + RTL). **Single commit only** at the end.
 
 ---
 
-## A) ML VISIBILITY, HEALTH BADGE, & API PROXY
+## 0) Objectives (recap)
 
-### A1) Add ML health proxy route
+* Fix **DSL** run failing with “tickers array required”.
+* Make **ML** tab fully functional (Generate → code/hyperparams, Run → metrics/preds/logs).
+* Add **loading/disable** states to prevent double-click & concurrent runs.
+* **Auto example prompts** swap when switching between **DSL** and **ML** modes.
+* Add **Manual Checker** toggle: same page, *Generate* buttons disabled, prefilled sample **DSL** and **ML** scripts + editable hyperparams; can still **Run**.
+* Add **sector selection** in ML panel (union with chosen tickers, deduped).
+* Add **tests** for API routes, UI payload correctness, Manual Checker behavior, sector expansion, loading guards, and smoke running of samples.
+* Expand **README.md**, **DOCUMENTATION.md**, **agents.md** with AWS (Docker/ECR/App Runner), S3 parquet layout & manifests, envs, runbooks, and test plans.
 
-Create `app/api/ml/health/route.ts` (App Router):
+---
+
+## 1) Types (shared contracts)
+
+**Create:** `types/strategy.ts`
 
 ```ts
-import { NextResponse } from 'next/server';
+export type StrategyMode = 'dsl' | 'ml';
 
-export const dynamic = 'force-dynamic';
+export interface DateRange { startDate?: string; endDate?: string; }
 
-export async function GET() {
-  const base = process.env.ML_API_URL?.replace(/\/+$/, '');
-  if (!base) {
-    return NextResponse.json({ status: 'down', error: 'ML_API_URL not set' }, { status: 200 });
-  }
-  try {
-    const r = await fetch(`${base}/health`, { cache: 'no-store' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const j = await r.json().catch(() => ({}));
-    return NextResponse.json({ status: 'ok', upstream: j }, { status: 200 });
-  } catch (e: any) {
-    return NextResponse.json({ status: 'down', error: String(e?.message || e) }, { status: 200 });
-  }
-}
-```
-
-### A2) Strategy Lab: show DSL/ML tabs + health badge
-
-Update the Strategy Lab client component (usually `app/(shell)/strategy/StrategyClient.tsx`; if this file doesn’t exist, create it and import it from `app/(shell)/strategy/page.tsx`). Requirements:
-
-* Tabs at top-right: **DSL** | **ML**.
-* Health badge next to “Strategy Lab” title. It polls `/api/ml/health` on mount and every 30s.
-* If health is `down`, ML controls render but “Generate”/“Run” are **disabled** with a tooltip.
-
-Add/merge (don’t duplicate imports):
-
-```tsx
-'use client';
-import React from 'react';
-
-type Health = { status: 'ok'|'down'; error?: string };
-
-export default function StrategyClient() {
-  const [mode, setMode] = React.useState<'dsl'|'ml'>('dsl');
-  const [health, setHealth] = React.useState<Health>({ status: 'down' });
-
-  React.useEffect(() => {
-    let alive = true;
-    const ping = async () => {
-      try {
-        const r = await fetch('/api/ml/health', { cache: 'no-store' });
-        const j = await r.json();
-        if (alive) setHealth(j);
-      } catch {
-        if (alive) setHealth({ status: 'down', error: 'fetch failed' });
-      }
-    };
-    ping();
-    const id = setInterval(ping, 30000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
-
-  const badge =
-    <span
-      className={`ml-3 inline-flex items-center px-2 py-1 rounded text-xs
-      ${health.status==='ok' ? 'bg-green-700/40 text-green-200' : 'bg-red-700/40 text-red-200'}`}
-      title={health.status==='ok' ? 'ML service reachable' : (health.error || 'ML service down')}
-      data-testid="ml-health-badge"
-    >
-      {health.status==='ok' ? 'ML online' : 'ML offline'}
-    </span>;
-
-  return (
-    <div className="container mx-auto px-6 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center">
-          <h1 className="text-3xl font-bold text-white">Strategy Lab</h1>
-          {badge}
-        </div>
-
-        <div className="inline-flex rounded-lg overflow-hidden border border-gray-700">
-          <button
-            data-testid="tab-dsl"
-            onClick={() => setMode('dsl')}
-            className={`px-4 py-2 text-sm ${mode==='dsl'?'bg-gray-700 text-white':'bg-gray-800 text-gray-300 hover:text-white'}`}
-          >DSL</button>
-          <button
-            data-testid="tab-ml"
-            onClick={() => setMode('ml')}
-            className={`px-4 py-2 text-sm ${mode==='ml'?'bg-gray-700 text-white':'bg-gray-800 text-gray-300 hover:text-white'}`}
-          >ML</button>
-        </div>
-      </div>
-
-      {/* render the two panels */}
-      {mode==='dsl' ? <DslPanel /> : <MlPanel mlOnline={health.status==='ok'} />}
-      
-      <HelpSections />
-    </div>
-  );
+export interface DslIndicators {
+  sma?: { periods: number[] };
+  ema?: { periods: number[] };
+  rsi?: { enabled: boolean; period?: number };
+  macd?: { enabled: boolean; fast?: number; slow?: number; signal?: number };
 }
 
-// Placeholders; wire to existing panels/components if present
-function DslPanel() { return <div>{/* existing DSL UI */}</div>; }
-function MlPanel({ mlOnline }: { mlOnline: boolean }) {
-  return (
-    <div className="space-y-6">
-      {/* existing ML UI (ModelCard, HyperparamForm, CodePane) */}
-      <button
-        className="mt-3 px-4 py-2 rounded bg-blue-600 text-white disabled:bg-gray-600"
-        disabled={!mlOnline}
-        title={mlOnline ? '' : 'ML service offline'}
-      >
-        Generate
-      </button>
-      <button
-        className="mt-3 px-4 py-2 rounded bg-green-600 text-white disabled:bg-gray-600"
-        disabled={!mlOnline}
-        title={mlOnline ? '' : 'ML service offline'}
-      >
-        Run ML
-      </button>
-    </div>
-  );
+export interface StrategyGenerateReq extends DateRange {
+  mode: StrategyMode;
+  tickers: string[];                 // required (>=1)
+  indicators?: DslIndicators;        // DSL only
+  prompt?: string;                   // DSL or ML
+  hyperparams?: Record<string, any>; // ML only
+}
+
+export interface StrategyRunReq extends DateRange {
+  mode: StrategyMode;
+  tickers: string[];                 // required
+  dsl?: string;                      // DSL mode
+  ml?: { code?: string; hyperparams?: Record<string, any> }; // ML mode
 }
 ```
 
 ---
 
-## B) “EXAMPLE PROMPTS” + “HOW IT WORKS” (DSL & ML)
+## 2) API: validate & unify (fix “tickers array required”)
 
-Append a unified helper section to Strategy Lab, at the bottom of the page, used by both modes:
+**Edit:** `app/api/strategy/generate/route.ts` and `app/api/strategy/run/route.ts`
 
-```tsx
-function HelpSections() {
-  const exampleDsl = [
-    'Momentum cross: Buy when 20 EMA crosses above 50 EMA; sell on cross down.',
-    'RSI mean reversion: Buy RSI<30 with 2% stop; sell RSI>55 or after 10 days.',
-    'MACD trend follow: Enter on MACD>0 & price>200SMA; exit on MACD<0.'
-  ];
-  const exampleMl = [
-    'GradientBoosting on daily OHLCV features with 60-day lookback; predict next-day return.',
-    'RandomForest using RSI/MACD/SMA(20,50) with sector embedding; optimize F1 for “up day”.',
-    'XGBoost with engineered volatility & rolling-beta; predict 5-day risk-adjusted return.'
-  ];
+* Parse body as `StrategyGenerateReq` / `StrategyRunReq`.
+* If `!Array.isArray(body.tickers) || body.tickers.length===0` → `return NextResponse.json({ error:'tickers array required' }, { status: 400 })`.
+* **DSL** path: accept `prompt` and/or `indicators`; keep existing DSL logic but consume values from the unified payload.
+* **ML** path: forward to `process.env.ML_API_URL`:
 
-  const fill = (text: string) => {
-    const ta = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="Describe your trading strategy"]');
-    if (ta) { ta.value = text; ta.dispatchEvent(new Event('input', { bubbles: true })); }
-  };
+  * Generate → `POST {base}/ml/generate`
+  * Run → `POST {base}/ml/run`
+  * `base = process.env.ML_API_URL?.replace(/\/+$/,'')`, return 501 if unset.
 
-  return (
-    <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-3">Example prompts</h3>
-        <div className="space-y-2">
-          {[...exampleDsl, ...exampleMl].map((p, i) => (
-            <button
-              key={i}
-              onClick={() => fill(p)}
-              className="block w-full text-left px-3 py-2 rounded bg-gray-700 text-gray-100 hover:bg-gray-600"
-              data-testid={`example-prompt-${i}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
+Add small helpers (optional) for clean fetch:
 
-      <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-3">How it works</h3>
-        <ol className="text-gray-300 list-decimal pl-5 space-y-2">
-          <li>Describe your idea → we generate either DSL (rules) or ML (model + params).</li>
-          <li>Review and edit: indicators, tickers, dates (auto min/max from selected), hyperparameters.</li>
-          <li>Run: backtester executes DSL; ML service trains/evaluates using Parquet from S3.</li>
-          <li>Inspect outputs: metrics, charts, predictions; iterate quickly.</li>
-        </ol>
-      </div>
-    </div>
-  );
+```ts
+async function proxyMl(path: string, body: any) {
+  const base = process.env.ML_API_URL?.replace(/\/+$/,'');
+  if (!base) return { status: 501, json: { error: 'ML_API_URL not set' } };
+  const r = await fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    // optionally: next: { revalidate: 0 }
+  });
+  const j = await r.json().catch(() => ({}));
+  return { status: r.status, json: j };
 }
 ```
 
 ---
 
-## C) API-TESTER: add ML section with live health
+## 3) Client wiring: always send `tickers: string[]`
 
-Update the existing `/api-tester` page (do not remove current content). Add a small ML box:
+**Edit:** Strategy Lab client (e.g. `app/(shell)/strategy/StrategyClient.tsx` and any sub-panels).
 
-```tsx
-// Inside api-tester page
-function MlHealthBox() {
-  const [j, setJ] = React.useState<any>(null);
-  return (
-    <div className="bg-gray-800 rounded-lg p-4 mt-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-white font-semibold">ML Service</h3>
-        <button
-          className="px-3 py-1 rounded bg-gray-700 text-gray-100"
-          onClick={async () => {
-            const r = await fetch('/api/ml/health'); const x = await r.json(); setJ(x);
-          }}
-          data-testid="ml-health-refresh"
-        >Check</button>
-      </div>
-      <pre className="mt-3 text-xs text-gray-300 whitespace-pre-wrap">{j ? JSON.stringify(j, null, 2) : '—'}</pre>
-    </div>
-  );
+* Pull `tickers: string[]` & `dateRange` from store.
+* **All** generate/run calls (DSL & ML) must include `tickers` array (never a single string).
+
+---
+
+## 4) Loading/disable (single-flight) for DSL & ML
+
+**Create:** `lib/useAsyncAction.ts`
+
+```ts
+import * as React from 'react';
+export function useAsyncAction<T extends any[]>(fn: (...a: T) => Promise<any>) {
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string|null>(null);
+  const run = React.useCallback(async (...a: T) => {
+    if (loading) return;
+    setLoading(true); setError(null);
+    try { return await fn(...a); }
+    catch (e:any) { setError(e?.message || 'Action failed'); throw e; }
+    finally { setLoading(false); }
+  }, [fn, loading]);
+  return { run, loading, error, setError };
 }
 ```
 
+**Apply:**
+
+* Wrap **DSL Generate**, **DSL Run**, **ML Generate**, **ML Run** with `useAsyncAction`.
+* Buttons show `Generating…` / `Running…`; **disabled** while loading or ML offline (for ML side).
+* Disable form inputs that would mutate a pending run (tickers/sectors/dates) during **Run**.
+* Add a slim top **progress bar** (CSS) or overlay while loading.
+* Render inline error text if `{ error }` returned.
+
 ---
 
-## D) PYTHON ML SERVICE: confirm S3 layout & (optional) CORS
+## 5) ML tab: fully functional
 
-**S3 layout:** per-symbol Parquet at `s3://ai-backtester-data-rosh/prod/<SYMBOL>.parquet`.
+**Generate →** `/api/strategy/generate` with:
 
-1. Ensure `services/ml/app/*` loads Parquet via env:
-
-   * `DATA_BUCKET=ai-backtester-data-rosh`
-   * `DATA_PREFIX=prod/`
-   * `DATA_LAYOUT=per-symbol`
-   * `AWS_REGION=us-east-1`
-
-2. Add adjustable CORS (if not present) in `services/ml/app/main.py`:
-
-```py
-from fastapi.middleware.cors import CORSMiddleware
-import os
-
-origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins if origins!=["*"] else ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+```ts
+{ mode:'ml', tickers, ...dateRange, prompt, hyperparams }
 ```
 
-* We will set `CORS_ORIGINS` in App Runner later if needed (e.g., your Vercel domain).
+On success:
 
-3. Make sure `requirements.txt` includes: `fastapi uvicorn boto3 s3fs pyarrow pandas numpy scikit-learn`.
+* Populate **CodePane** with returned code (`j.code || j.python || ''`).
+* Sync **hyperparams** (merge defaults & returned values).
+* Clear errors.
 
-*Rebuild/push image only if you changed the Python code; otherwise skip.*
+**Run →** `/api/strategy/run` with:
 
----
-
-## E) TESTS (vitest)
-
-Add/adjust tests to cover:
-
-1. Strategy Lab renders DSL/ML tabs and health badge:
-
-   * `getByTestId('tab-ml')` exists.
-   * `getByTestId('ml-health-badge')` shows “ML online/offline” depending on mocked `/api/ml/health`.
-2. Example prompt button inserts text into the correct textarea.
-3. ML disabled state when health is `down`.
-
-You can stub `global.fetch` in tests to return `{status:'ok'}` or `{status:'down'}` for `/api/ml/health`.
-
----
-
-## F) DOCUMENTATION — expand thoroughly
-
-### F1) README.md (top-level)
-
-Add a new section **“Architecture overview & deployments”**:
-
-* **Frontend (Vercel)**: Next.js app (Dashboard / Strategy Lab / Data Warehouse), `ML_API_URL` consumed by `/api/ml/health` and strategy routes.
-* **ML Service (AWS App Runner)**: Docker image from **ECR**, runs FastAPI on **port 8000**.
-* **Data**: S3 bucket `ai-backtester-data-rosh`, layout **per-symbol** at `prod/<SYMBOL>.parquet`.
-* **Environments**:
-
-  * Local: set `.env.local` (`ML_API_URL` optional), run `npm run dev`.
-  * Cloud: set Vercel env `ML_API_URL=https://<apprunner-domain>/`.
-
-Add **Quickstart**:
-
-1. Build/push ML: `services/ml/Dockerfile` → ECR.
-2. App Runner: create service, **Instance role** with `AmazonS3ReadOnlyAccess`, envs (`DATA_BUCKET=ai-backtester-data-rosh`, `DATA_PREFIX=prod/`, `DATA_LAYOUT=per-symbol`), health `/health`, port 8000.
-3. Vercel: add `ML_API_URL`, redeploy.
-
-### F2) DOCUMENTATION.md
-
-Add detailed runbook sections (bullet points, not prose walls):
-
-* **S3 Data Layout**
-
-  * Bucket: `ai-backtester-data-rosh`
-  * Prefix: `prod/`
-  * Files: `prod/<SYMBOL>.parquet` (per-symbol)
-  * Expected columns: date/time, open/high/low/close/volume (+ engineered features if present)
-  * Min/Max date discovery for selected tickers (used to auto-populate date range in UI)
-* **Docker/ECR/App Runner**
-
-  * Build: `docker build -t ai-backtester-ml:latest .` (from `services/ml`)
-  * Tag/push to: `<ACCOUNT>.dkr.ecr.us-east-1.amazonaws.com/ai-backtester-ml:latest`
-  * App Runner: container URI, automatic deployments, port 8000, health `/health`
-  * Roles:
-
-    * **ECR access role** (created by App Runner wizard)
-    * **Instance role** with **AmazonS3ReadOnlyAccess**
-  * Env vars on service:
-
-    * `DATA_BUCKET=ai-backtester-data-rosh`
-    * `DATA_PREFIX=prod/`
-    * `DATA_LAYOUT=per-symbol`
-    * `AWS_REGION=us-east-1`
-    * `CORS_ORIGINS=https://<your-vercel-domain>` (optional)
-* **Environment Variables**
-
-  * **App (Vercel / local)**: `ML_API_URL`, `OPENAI_API_KEY` (if used by the app), `NEXT_PUBLIC_APP_URL`
-  * **ML service (App Runner)**: `DATA_*`, `AWS_REGION`, optional `CORS_ORIGINS`
-  * Do **not** store AWS keys in `.env.local` or Vercel. App Runner uses its **instance role** for S3.
-* **Health & Troubleshooting**
-
-  * `/api/ml/health` (frontend) → proxies App Runner `/health`.
-  * Common errors: 403 S3 (missing instance role), CORS, `ML_API_URL` blank.
-  * How to tail App Runner logs; redeploy steps.
-
-### F3) agents.md (new or extend heavily)
-
-Purpose: a living handoff file for ML agents. Include:
-
-* **System diagram**: Vercel (Next.js) → `ML_API_URL` → App Runner (FastAPI) → S3 (Parquet per-symbol).
-* **Data contracts**
-
-  * Request: tickers[], startDate, endDate, modelType, hyperparams (strict schema), renderedCode (if using templating)
-  * Response: metrics (accuracy/F1/MSE/etc.), feature importances (if supported), predictions (per timestamp), logs.
-* **Templates & Models**
-
-  * Supported: RandomForest, XGBoost/GradientBoosting, LogisticRegression; feature windowing (rolling means, RSI/MACD/SMA/EMA).
-  * Template placeholder list and validation rules.
-* **S3 paths**
-
-  * `s3://ai-backtester-data-rosh/prod/<SYMBOL>.parquet` (CSV/Parquet schema expectations).
-* **Deployment playbook**
-
-  * ECR build/tag/push commands.
-  * App Runner create/update, required roles & envs.
-  * CORS tuning via `CORS_ORIGINS`.
-* **Ops**
-
-  * Health checks, log locations, how to bump instance size, autoscaling notes.
-  * Security: instance role only, no long-lived secrets in app.
-* **TODOs**
-
-  * Sector filters—expected `sectors.json` manifest (optional) and how to wire sector→tickers.
-  * Model registry (persist configs).
-  * Batched training/explainability.
-
----
-
-## G) CLEANUP & ENV EXAMPLES
-
-* Update `.env.example`:
-
-  ```
-  NEXT_PUBLIC_APP_URL=http://localhost:3000
-  OPENAI_API_KEY=
-  OPENAI_MODEL=gpt-4o-mini
-  ML_API_URL=
-  S3_BASE=https://ai-backtester-data-rosh.s3.amazonaws.com/prod
-  ```
-* Do not include AWS keys in `.env.example` or README.
-* Remove duplicate/unused envs from examples; keep comments short.
-
----
-
-## H) FINALIZE
-
-1. Implement code + docs above.
-2. Add/adjust tests (as noted).
-3. Run locally:
-
-   ```
-   npm ci
-   npm run test
-   npm run typecheck
-   npm run build
-   npm run dev
-   ```
-4. Commit with messages:
-
-   * `feat(strategy): add DSL/ML tabs, ML health badge, helper sections`
-   * `feat(api): add /api/ml/health proxy`
-   * `docs: expand README/DOCUMENTATION/agents for AWS + S3 layout`
-   * `test: cover ML health, example prompts, disabled states`
-5. Push to **FeatureComponent** and open a PR.
-
----
-
-**NOTE:** If ML service is online (App Runner `/health` OK) but browser calls fail due to CORS, set in App Runner **Environment variables**:
-
-```
-CORS_ORIGINS=https://<your-vercel-domain>
+```ts
+{ mode:'ml', tickers, ...dateRange, ml: { code, hyperparams } }
 ```
 
-and redeploy the service.
+On success:
+
+* Show **metrics** (key/value list), **predictions** preview table (e.g., timestamp, symbol, y_pred, prob?), and optional **logs** in a right-side results pane.
+
+**Remove** any “in development” banners; keep **ML health badge** in header (green/red), and **disable** ML actions if offline.
 
 ---
 
-**End of instructions.**
+## 6) Auto example prompts swap with mode
+
+**Edit:** the helper section component at bottom of Strategy Lab.
+
+* Two arrays:
+
+```ts
+const DSL_EXAMPLES = [
+  'Momentum cross: Buy EMA(20)>SMA(50); sell on cross-down.',
+  'RSI mean reversion: Buy RSI<30; exit RSI>55 or after 10 bars.'
+];
+const ML_EXAMPLES = [
+  'RandomForest on OHLCV + RSI/MACD with 60-day window; predict next-day up/down.',
+  'XGBoost with volatility features; optimize F1; threshold=0.55 for buys.'
+];
+```
+
+* When tab = **DSL**, show DSL examples; when tab = **ML**, show ML examples.
+* Clicking an example **fills the active mode’s main prompt** textarea/editor.
+
+---
+
+## 7) **Manual Checker** toggle (top-right)
+
+* Header contains a **Manual checker** switch (`manual:boolean` in state).
+* In **Manual** mode:
+
+  * Keep same page/UX, but **Generate** buttons are disabled/greyed.
+  * If editors are empty on entering Manual:
+
+    * Prefill **DSL** editor with a *valid* sample strategy (use your accepted DSL syntax).
+    * Prefill **ML** editor with a runnable **Python** template (imports, feature windowing, basic model fit/predict) and default **hyperparams**.
+  * **Run Backtest / Run ML** remain enabled (with loading guards).
+* Note in UI (small hint) that Manual mode skips AI generation by design.
+
+---
+
+## 8) ML **sector selection**
+
+**Data source priority:**
+
+1. If `process.env.S3_BASE` available, try `${S3_BASE}/sectors.json`.
+2. Fallback to local `public/data/sectors.json`.
+
+**Format:**
+
+```json
+{
+  "Technology": ["AAPL","MSFT","NVDA"],
+  "Financials": ["JPM","BAC","C"]
+}
+```
+
+**Add component:** `components/strategy/SectorSelect.tsx`
+
+* Multi-select sectors; show chips with counts.
+* On change, compute **union** of sector tickers and manually selected tickers → **dedupe**.
+* Store additions in Zustand: `selectedSectors: string[]`, `setSelectedSectors`.
+* Payload `tickers[]` always uses this **union**.
+
+---
+
+## 9) Tests (Vitest + RTL) — add comprehensive coverage
+
+**a) API route tests** (invoke route handlers directly)
+
+* **File:** `tests/api-strategy-generate.test.ts`
+
+  * 400 if `tickers` missing/empty.
+  * DSL path returns 200 with mock OpenAI/DSL generator (stub internal fn or bypass).
+  * ML path proxies to `ML_API_URL` (mock `global.fetch`) and bubbles status/body.
+* **File:** `tests/api-strategy-run.test.ts`
+
+  * 400 if `tickers` missing/empty.
+  * DSL path consumes `dsl` and returns 200 in happy path (stub backtester).
+  * ML path proxies to `/ml/run` and returns metrics/preds.
+
+**b) Strategy Lab UI tests**
+
+* **File:** `tests/strategy-dsl-payload.test.tsx`
+
+  * Select 2 tickers; click **Run DSL**; assert `fetch` body contains `tickers: ["AAPL","MSFT"]`.
+* **File:** `tests/strategy-ml-generate-run.test.tsx`
+
+  * Mock `/api/strategy/generate` → `{ code:"print('ok')", hyperparams:{ n_estimators:100 } }`. Click **Generate**; CodePane updates; hyperparam control shows 100; button disabled while loading.
+  * Mock `/api/strategy/run` → `{ metrics:{ accuracy:0.7 }, predictions:[{ts:"2024-01-01",symbol:"AAPL",y_pred:1}] }`. Click **Run ML**; metrics rendered; 1 prediction row present.
+* **File:** `tests/strategy-manual-mode.test.tsx`
+
+  * Toggle **Manual checker**; **Generate** buttons disabled; sample DSL/ML code present (non-empty).
+  * Run buttons still enabled; clicking triggers single request (ensure single-flight).
+* **File:** `tests/strategy-sectors.test.tsx`
+
+  * Provide mock `sectors.json` (jest/vitest mock for fetch). Select “Technology” + “AAPL” manually; payload includes deduped union.
+* **File:** `tests/strategy-loading-guards.test.tsx`
+
+  * Click **Run** twice quickly → only one network call fires; button text flips to `Running…`.
+* **File:** `tests/strategy-health-badge.test.tsx`
+
+  * Mock `/api/ml/health` ok → badge “ML online”; error → “ML offline” and ML actions disabled with tooltip.
+
+> Keep tests fast by mocking `fetch` and any heavy components. Use `data-testid`/`aria-label`s consistently (we already added specific labels earlier).
+
+---
+
+## 10) Docs updates
+
+**.env.example**
+
+```
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# S3 parquet (public discovery)
+AWS_REGION=us-east-1
+AWS_BUCKET=ai-backtester-data-rosh
+AWS_PREFIX=prod
+S3_BASE=https://ai-backtester-data-rosh.s3.amazonaws.com/prod
+
+# ML service
+ML_API_URL=https://<your-app-runner-domain>/
+# optional (local): ALLOW_LOCAL_PY=0
+```
+
+**README.md** (append/replace sections as needed)
+
+* **Strategy Lab (DSL & ML):**
+
+  * Tabs, **ML health badge** (`/api/ml/health`), auto example prompts.
+  * **Manual Checker** mode (Generate disabled; prefilled scripts; Run allowed).
+  * **Loading/disable** behavior to prevent double-clicks.
+* **Sectors (ML):** Select sectors or stocks; union + dedupe; `sectors.json` source (S3_BASE then local).
+* **Quick test plan:** how to run `npm test`, what to expect (key passing assertions).
+* **Environment vars:** list and meanings.
+* **Troubleshooting:** CORS on ML, 400 tickers error, ML_API_URL unset (501).
+
+**DOCUMENTATION.md**
+
+* **API contracts** (`/api/strategy/generate`, `/api/strategy/run`)
+
+  * Request/response for DSL & ML; error shape `{ error: string }`.
+* **Data layout:** S3 parquet per symbol at `s3://<bucket>/<prefix>/<SYMBOL>.parquet`; optional `sectors.json` manifest; future sector expansion.
+* **AWS Deployment:** Docker → ECR → App Runner. Roles (`AppRunnerECRAccessRole`, `AppRunnerInstanceS3ReadRole`), env vars, health check `/health`, scaling hints.
+* **Runtime model:** ML service reads S3 parquet via role with S3 read.
+* **Test coverage map:** list the test files and what they verify.
+
+**agents.md**
+
+* **Purpose & scope:** DSL and ML backtesting agents; what state/store to touch.
+* **State/UX contract:** Single-flight, health polling, disabling rules, Manual checker behavior.
+* **Templates:** DSL sample, ML Python template, hyperparams schema expectations.
+* **Data sources:** S3 parquet layout; `sectors.json` contract and priority (S3 then local).
+* **AWS runbook:** How the Docker/ECR/App Runner pieces fit; redeploy steps; env changes.
+* **Diagnostics:** What to log/return from ML service (`metrics`, `predictions`, optional `logs`).
+
+---
+
+## 11) Small UI affordances (consistency)
+
+* Ensure **aria-label**/`data-testid` on:
+
+  * Generate/Run buttons for DSL & ML (distinct).
+  * Health badge (`ml-health-badge`).
+  * Sector chips and sector multi-select.
+  * Manual checker toggle.
+  * Code editors (`dsl-editor`, `ml-editor`).
+* Tooltips on disabled ML actions when offline: “ML service offline.”
+
+---
+
+## 12) Finalize (single commit)
+
+Run and verify:
+
+```bash
+npm run test
+npm run typecheck
+npm run build
+```
+
+**Stage all**, then **one commit** only:
+
+```bash
+git add -A
+git commit -m "feat(strategy): unify payloads; fix DSL tickers; fully wire ML generate/run with loading & results; add Manual Checker; sector selection; comprehensive tests; and expanded docs for AWS/S3/ML. (single commit)"
+```
+
+Push to **FeatureComponent**.
+
+**End.**

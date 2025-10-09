@@ -23,9 +23,16 @@ Web-based, AI-powered strategy backtesting over historical market data stored as
 - **Create strategy handoff**: Seamlessly switches to Strategy Lab with pre-filled context
 
 ### Strategy Lab
+- **DSL & ML Modes**: Toggle between rule-based DSL strategies and ML-powered models with health monitoring
+- **ML Health Badge**: Real-time health check polling (every 30s) shows ML service online/offline status
 - **Prefill from Dashboard**: Accepts tickers, indicators, and date ranges from Dashboard or URL
-- **Sector selection**: Multi-select sectors to automatically include all tickers from those sectors (if sector data available)
-- **AI strategy generation**: Natural language prompts converted to executable DSL
+- **Sector selection**: Multi-select sectors to automatically include all tickers from those sectors (deduped union with manual selections)
+- **AI strategy generation**: Natural language prompts converted to executable DSL or ML models
+- **Manual Checker Mode**: Disable AI generation, use prefilled editable sample scripts for testing
+- **Loading guards**: Single-flight protection prevents double-click issues; visual loading states on all async actions
+- **Auto-swapping example prompts**: Context-aware examples change based on DSL/ML mode
+- **Hyperparameter tuning**: Interactive controls for ML model parameters with validation
+- **Results visualization**: Metrics, predictions table, and logs for ML; equity curves for DSL
 - **Standalone operation**: Works independently when accessed directly without prefill
 
 ### Data Warehouse
@@ -146,6 +153,8 @@ CORS_ORIGINS=https://<your-vercel-domain>  (optional, defaults to *)
     - `dashboard-select.test.tsx` — Dashboard ticker selection functionality
     - `dashboard-to-strategy-handoff.test.tsx` — Strategy Lab handoff testing
     - `chart-readability.test.tsx` — Multi-ticker chart feature testing
+    - `api-strategy-generate.test.ts` — API route validation for DSL/ML generation
+    - `strategy-lab-integration.test.tsx` — Strategy Lab UI integration tests (DSL/ML modes, Manual Checker, loading guards, sector selection)
 
 ## Data & Manifest
 
@@ -253,20 +262,47 @@ Keep `.env.local` as the source of truth locally; replicate these in Vercel → 
 
 ## Troubleshooting
 
-- Vercel build error: “stream did not contain valid UTF-8” for `app/.../page.tsx`  
+### Strategy Lab Issues
+
+- **400 Error: "tickers array required"**
+  Cause: DSL/ML run endpoints expect `tickers: string[]` in request body.
+  Fix: Ensure Strategy Lab always sends tickers array (never single string).
+
+- **ML service offline / 501 Error**
+  Cause: `ML_API_URL` not set or ML service unreachable.
+  Fix:
+    - Check `ML_API_URL` is set in Vercel environment variables
+    - Verify App Runner service is running and health check passes
+    - Check CORS configuration if ML service blocks requests
+
+- **CORS errors with ML service**
+  Cause: ML service rejecting frontend origin.
+  Fix: Set `CORS_ORIGINS=https://your-vercel-domain.vercel.app` in App Runner environment variables.
+
+- **Generate buttons always disabled**
+  Cause: Manual Checker mode is enabled.
+  Fix: Toggle off "Manual checker" switch in Strategy Lab header.
+
+- **Loading state stuck / buttons disabled**
+  Cause: Previous async action failed without cleanup.
+  Fix: Refresh page; check browser console for errors; verify API endpoints respond correctly.
+
+### Build & Deployment Issues
+
+- **Vercel build error: "stream did not contain valid UTF-8" for `app/.../page.tsx`**
   Cause: files saved with non-UTF-8 or CRLF; fix by re-saving as UTF-8 LF and committing `.gitattributes`:
     - Ensure editor saves `app/dashboard/page.tsx` and `app/strategy/page.tsx` as **UTF-8 (LF)**.
     - Add `.gitattributes` line: `* text=auto eol=lf`
     - Commit and redeploy.
 
-- Charts flat at 0 for non-AAPL tickers  
+- **Charts flat at 0 for non-AAPL tickers**
   Most likely normalization gaps (schema variants, DECIMAL scales, BigInt). See `DOCUMENTATION.md` → Parquet normalization. Ensure the loader:
     - Maps aliases (open|o|OpenPrice, high|h|HighPrice, low|l|LowPrice, close|c|ClosePrice, volume|v|Volume)
     - Handles decimals (divide by 10^scale when applicable)
     - Converts BigInt/Int64 to JS number
     - Skips invalid rows rather than defaulting to 0
 
-- Missing env variables  
+- **Missing env variables**
   App uses `.env.local` automatically. For manual CLI tests, export needed vars into the shell or sync from `.env.local`.
 
 ## Notes

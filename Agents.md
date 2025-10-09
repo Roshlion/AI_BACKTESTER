@@ -18,12 +18,44 @@
 ### Current Branch & Status
 - **Active Branch**: `FeatureComponent`
 - **Main Branch**: `main` (stable, for PRs)
-- **Last Major Commit**: 2025-10-08 - ML integration, test fixes, infrastructure
-- **Build Status**: ✅ TypeScript passing, ✅ Build successful, ⚠️ Tests (29 passing, 9 failing - test setup issues not code defects)
+- **Last Major Commit**: 2025-10-09 - ML UI visibility, health badge, AWS deployment docs
+- **Build Status**: ⏳ Pending validation (changes uncommitted)
 
 ---
 
 ## Recent Work History & Change Log
+
+### 2025-10-09: ML UI Visibility & Health Monitoring
+**What Was Done**:
+- Implemented DSL/ML tab switcher in Strategy Lab with health badge
+- Added ML health monitoring via `/api/ml/health` proxy endpoint
+- Health badge polls every 30 seconds, shows "ML online/offline" status
+- ML tab shows placeholder UI; controls disabled when service offline
+- Added "Example prompts" and "How it works" helper sections
+- Updated API tester page with ML service health check widget
+- Enhanced Python ML service:
+  - Configurable CORS via `CORS_ORIGINS` environment variable
+  - S3 configuration via env vars (`DATA_BUCKET`, `DATA_PREFIX`, `DATA_LAYOUT`)
+  - Health endpoint now returns service config for debugging
+  - Added boto3, s3fs, pyarrow dependencies for S3 Parquet access
+- Comprehensive documentation updates:
+  - README: Added "Architecture Overview & Deployments" with AWS quickstart
+  - DOCUMENTATION.md: Added ML Service section with Docker/ECR/App Runner workflow
+  - agents.md: Updated status and work log
+- Updated `.env.example` with ML variables and security notes
+
+**Why It Matters**:
+- ML features now visible in UI with clear online/offline status
+- Users can toggle between DSL and ML modes seamlessly
+- Health monitoring prevents confusing errors when ML service unavailable
+- Complete deployment documentation for AWS App Runner
+- Production-ready CORS and S3 configuration
+
+**Implementation Details**:
+- Health polling pattern: useEffect with 30s interval, cleanup on unmount
+- Disabled state tied to health.status !== 'ok'
+- Example prompts work for both DSL and ML modes
+- S3 layout: `s3://ai-backtester-data-rosh/prod/<SYMBOL>.parquet`
 
 ### 2025-10-08: ML Integration & Infrastructure (Commit 1a87eb4)
 **What Was Done**:
@@ -68,17 +100,21 @@
 ## Critical Ongoing Issues
 
 ### 🔴 High Priority
-1. **Strategy Builder UI Integration**
-   - **Status**: Components exist, not yet integrated into Strategy Lab
-   - **What's Done**: ModelCard, HyperparamForm, CodePane components created
-   - **What's Needed**: Modify `app/(shell)/strategy/StrategyClient.tsx` to include:
-     - Strategy Type toggle (DSL vs ML)
-     - ML generation flow (generate → review hyperparams → run)
-     - Integration with existing `/backtester` example prompts and "How it works" section
+1. **Strategy Builder UI Integration** ✅ **PARTIALLY COMPLETE (2025-10-09)**
+   - **Status**: UI scaffold complete, full integration pending
+   - **What's Done**:
+     - DSL/ML tabs added to Strategy Lab
+     - Health badge with 30s polling
+     - ML placeholder UI with disabled state when offline
+     - Example prompts and "How it works" sections added
+     - `/api/ml/health` proxy endpoint created
+   - **What's Remaining**:
+     - Wire ML generation to actual ModelCard/HyperparamForm/CodePane components
+     - Connect "Generate ML Model" button to `/api/strategy/generate?mode=ml`
+     - Display ML results (metrics, predictions) after "Run ML Backtest"
    - **Files to Modify**:
-     - `app/(shell)/strategy/StrategyClient.tsx` - Add ML mode UI
-     - Consider moving/copying content from `app/backtester/page.tsx` and `components/strategy-form.tsx`
-   - **Context**: The `/backtester` page has a complete Strategy Builder UI with examples that should be merged into Strategy Lab
+     - `app/(shell)/strategy/StrategyClient.tsx` - Complete ML flow integration
+     - Import and use components from `components/strategy/`
 
 2. **Test Failures**
    - **Status**: 9 tests failing, 29 passing

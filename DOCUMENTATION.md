@@ -73,23 +73,52 @@ Recommendation: keep a single `normalizeRow(row)` used by Parquet and CSV loader
 - `GET /api/local-data?ticker=XYZ&start=YYYY-MM-DD&end=YYYY-MM-DD`  
   Loads `S3_BASE/XYZ.parquet` (or `.csv` fallback), normalizes rows, date-filters, returns JSON.
 
-- `POST /api/strategy/generate`  
-  Body: `{ "prompt": "string" }`  
-  Returns: `{ "dsl": { name, rules:[...] } }` using `OPENAI_API_KEY`/`OPENAI_MODEL`.
+- `GET /api/ml/health`
+  Proxies health check to ML service at `ML_API_URL/health`.
+  Returns: `{ "status": "ok"|"down", "upstream": {...}, "error"?: string }`
 
-- `POST /api/strategy/run`  
-  Body:
+- `POST /api/strategy/generate`
+  Body (unified for DSL and ML):
 
         {
           "mode": "dsl" | "ml",
-          "tickers": ["AAPL", "..."],
-          "startDate": "YYYY-MM-DD",
-          "endDate": "YYYY-MM-DD",
-          "dsl": { "name": "...", "rules": [...] },   // when mode = "dsl"
-          "code": "..."                                // when mode = "ml" (future)
+          "tickers": ["AAPL", "MSFT"],           // REQUIRED: array of ticker symbols (>=1)
+          "startDate": "YYYY-MM-DD",              // optional
+          "endDate": "YYYY-MM-DD",                // optional
+          "prompt": "strategy description",       // DSL or ML prompt
+          "indicators": {                         // DSL only: indicator config
+            "sma": { "periods": [50, 200] },
+            "ema": { "periods": [12, 26] },
+            "rsi": { "enabled": true, "period": 14 },
+            "macd": { "enabled": true, "fast": 12, "slow": 26, "signal": 9 }
+          },
+          "hyperparams": {                        // ML only: initial hyperparameters
+            "n_estimators": 100,
+            "max_depth": 10,
+            "learning_rate": 0.1
+          }
         }
 
-  Returns:
+  Returns (DSL mode): `{ "dsl": { name, rules:[...] } }` using `OPENAI_API_KEY`/`OPENAI_MODEL`.
+  Returns (ML mode): `{ "code": "python script", "hyperparams": {...} }` via ML service proxy.
+  Error: `{ "error": "message" }` with 400/500/501 status.
+
+- `POST /api/strategy/run`
+  Body (unified for DSL and ML):
+
+        {
+          "mode": "dsl" | "ml",
+          "tickers": ["AAPL", "..."],            // REQUIRED: array (>=1)
+          "startDate": "YYYY-MM-DD",
+          "endDate": "YYYY-MM-DD",
+          "dsl": "...",                          // when mode = "dsl": DSL code/config
+          "ml": {                                 // when mode = "ml"
+            "code": "python script",
+            "hyperparams": { "n_estimators": 100, ... }
+          }
+        }
+
+  Returns (DSL mode):
 
         {
           "ok": true,
@@ -102,6 +131,19 @@ Recommendation: keep a single `normalizeRow(row)` used by Parquet and CSV loader
             }
           ]
         }
+
+  Returns (ML mode):
+
+        {
+          "metrics": { "accuracy": 0.72, "f1": 0.68, "precision": 0.71, "recall": 0.65 },
+          "predictions": [
+            { "ts": "2024-01-01", "symbol": "AAPL", "y_pred": 1, "prob": 0.62 },
+            ...
+          ],
+          "logs": "Training completed in 3.2s..."  // optional
+        }
+
+  Error: `{ "error": "message" }` with 400/500 status.
 
 ## 5. Strategy Engine (DSL)
 
@@ -137,10 +179,39 @@ The application uses a three-tab shell layout with consistent navigation.
 
 ### Strategy Lab (`/strategy`)
 - **Server→Client pattern**: Server component parses searchParams, passes to StrategyClient in Suspense
+- **DSL & ML Mode Toggle**: Switch between rule-based DSL and ML-powered strategies
+  - DSL mode: Natural language → OpenAI → executable DSL rules
+  - ML mode: Prompt → ML service (`/ml/generate`) → Python code + hyperparameters
+- **ML Health Monitoring**:
+  - Real-time badge polls `/api/ml/health` every 30s
+  - Shows "ML online/offline" status
+  - Disables ML actions when service unavailable
 - **Prefill support**: Accepts tickers, indicators, start/end from URL params or Zustand store fallback
-- **Sector selection**: Multi-select sectors auto-populate ticker selection (if sector mapping available)
-- **AI generation**: Natural language prompt → DSL via `/api/strategy/generate`
-- **Backtest execution**: DSL → results via `/api/strategy/run`
+- **Sector selection**: Multi-select sectors with union/dedupe logic
+  - Combines sector-based tickers with manual selections
+  - Deduplicates final ticker array
+  - Source priority: `S3_BASE/sectors.json` → `public/data/sectors.json`
+- **Manual Checker Mode**:
+  - Toggle disables AI generation buttons
+  - Prefills editable sample DSL and ML code on activation
+  - Run buttons remain active for testing
+- **Loading Guards**:
+  - Single-flight protection via `useAsyncAction` hook
+  - Prevents double-click issues
+  - Visual loading states (progress bar + button text)
+  - Disables form inputs during run to prevent mutation
+- **Auto-swapping Example Prompts**:
+  - DSL mode: Shows DSL-specific examples (EMA cross, RSI mean reversion)
+  - ML mode: Shows ML-specific examples (RandomForest, XGBoost)
+  - Click to fill corresponding prompt textarea
+- **Hyperparameter Tuning** (ML only):
+  - Interactive form with validation (min/max/step)
+  - Types: number, select, text
+  - Help text and range indicators
+  - Syncs with generated/manual hyperparams
+- **Results Visualization**:
+  - DSL: Equity curves, trades list, summary stats
+  - ML: Metrics grid, predictions table (first 10), optional logs
 - **Standalone operation**: Works independently when accessed directly
 
 ### Data Warehouse (`/explore`)
