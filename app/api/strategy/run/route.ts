@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { normaliseDsl, runBacktest, type StrategyDSL } from "@/lib/strategy-engine";
 import { readTickerRange } from "@/lib/safeParquet";
+import { simulatePortfolio } from "@/lib/portfolio";
 import * as mlClient from "@/lib/ml-client";
 import type { StrategyRunReq } from "@/types/strategy";
+import type { PortfolioConfig } from "@/types/portfolio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +15,19 @@ const DEFAULT_DSL: StrategyDSL = {
   rules: [
     { type: "sma_cross", params: { fast: 10, slow: 30, enter: "fast_above", exit: "fast_below" } },
   ],
+};
+
+const DEFAULT_PORTFOLIO: PortfolioConfig = {
+  startingCash: 100000,
+  leverage: 1,
+  sizing: { type: "percent_of_equity", pct: 10 },
+  commissionFixed: 0,
+  commissionPct: 0.0005,
+  slippageBps: 2,
+  borrowRateShort: 0,
+  allowShort: false,
+  rebalance: "none",
+  rebalanceDriftPct: 5,
 };
 function uniqueTickers(input: unknown): string[] {
   if (!input) return [];
@@ -129,19 +144,87 @@ export async function POST(req: NextRequest) {
     }
 
     const dsl: StrategyDSL = body.dsl ? normaliseDsl(body.dsl) : DEFAULT_DSL;
+    const portfolio: PortfolioConfig = body.portfolio || DEFAULT_PORTFOLIO;
 
+    // Check if Python DSL backtest path is enabled
+    const usePyBacktester = process.env.USE_PY_BACKTESTER === "1" || process.env.USE_PY_BACKTESTER === "true";
+
+    if (usePyBacktester) {
+      // Forward to Python service for DSL backtesting
+      const ML_API_URL = process.env.ML_API_URL;
+      if (!ML_API_URL) {
+        return NextResponse.json({
+          ok: false,
+          error: "USE_PY_BACKTESTER=1 requires ML_API_URL to be set"
+        }, { status: 501 });
+      }
+
+      try {
+        const response = await fetch(`${ML_API_URL}/backtest/dsl`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tickers,
+            start: startDate,
+            end: endDate,
+            dsl,
+            portfolio,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(`Python DSL backtest failed: ${error}`);
+        }
+
+        const result = await response.json();
+        return NextResponse.json(result);
+      } catch (pyError) {
+        return NextResponse.json({
+          ok: false,
+          error: pyError instanceof Error ? pyError.message : "Python DSL backtest failed"
+        }, { status: 500 });
+      }
+    }
+
+    // Default: TypeScript DSL backtest path
+    // Prepare ticker signals for portfolio simulator
+    const tickerSignals = [];
     for (const ticker of tickers) {
       const rows = await readTickerRange(ticker, startDate, endDate);
       if (!rows.length) {
         logs.push(`${ticker}: no data in range`);
         continue;
       }
+
+      // Generate signals from DSL
       const result = runBacktest(dsl, rows);
-      perTicker.push({ ticker, mode: "dsl", stats: result.stats, trades: result.trades, equity: result.equity });
+
+      // Convert trades to enter/exit signals
+      const enterSignals = new Array(rows.length).fill(false);
+      const exitSignals = new Array(rows.length).fill(false);
+
+      for (const trade of result.trades) {
+        if (trade.entryIdx < enterSignals.length) {
+          enterSignals[trade.entryIdx] = true;
+        }
+        if (trade.exitIdx < exitSignals.length) {
+          exitSignals[trade.exitIdx] = true;
+        }
+      }
+
+      tickerSignals.push({
+        ticker,
+        rows,
+        enterSignals,
+        exitSignals,
+      });
     }
 
-    const summary = summariseDslResults(perTicker, startDate, endDate);
-    return NextResponse.json({ ok: true, summary, perTicker, logs });
+    // Run portfolio simulation
+    const portfolioResults = simulatePortfolio(tickerSignals, portfolio, "dsl");
+
+    return NextResponse.json(portfolioResults);
   } catch (error) {
     console.error("/api/strategy/run", error);
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });

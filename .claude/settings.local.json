@@ -15,7 +15,16 @@
       "Bash(node:*)",
       "Bash(npm ci:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(if [ -f .env.local ])",
+      "Bash(then grep -E \"S3_BASE|AWS_\" .env.local)",
+      "Bash(else echo \"No .env.local found\")",
+      "Bash(fi)",
+      "Bash(timeout:*)",
+      "Bash(cat:*)",
+      "Bash(pnpm test:*)",
+      "Bash(npm test:*)",
+      "Bash(python -m pytest tests/ -v)"
     ],
     "deny": [],
     "ask": []

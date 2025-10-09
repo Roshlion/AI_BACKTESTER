@@ -1,73 +1,47 @@
 "use client";
 
 import { useState } from "react";
-import { StrategyForm } from "@/components/strategy-form";
-import { BacktestResults } from "@/components/backtest-results";
+import { StrategyFormNew } from "@/components/strategy/StrategyFormNew";
+import { BacktestResultsNew } from "@/components/backtest-results-new";
 import { Database, Sparkles, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-
-interface BacktestResult {
-  ok: boolean;
-  summary: any;
-  perTicker: any[];
-  logs: string[];
-}
-
-interface GeneratedStrategy {
-  mode: string;
-  dsl?: any;
-  code?: string;
-}
+import type { BacktestResults } from "@/types/portfolio";
+import type { DSL } from "@/components/strategy/DSLBuilder";
+import type { MLConfig } from "@/components/strategy/MLBuilder";
+import type { PortfolioConfig } from "@/types/portfolio";
 
 export default function BacktesterPage() {
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<BacktestResult | null>(null);
-  const [generatedStrategy, setGeneratedStrategy] = useState<GeneratedStrategy | null>(null);
+  const [results, setResults] = useState<BacktestResults | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleRunStrategy = async (params: {
-    prompt: string;
     mode: "dsl" | "ml";
     tickers: string[];
     startDate: string;
     endDate: string;
+    dsl?: DSL;
+    ml?: MLConfig;
+    portfolio: PortfolioConfig;
   }) => {
     setLoading(true);
     setError(null);
     setResults(null);
-    setGeneratedStrategy(null);
 
     try {
-      // Step 1: Generate strategy using OpenAI
-      const generateResponse = await fetch("/api/strategy/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: params.prompt,
-          mode: params.mode,
-        }),
-      });
-
-      const generateResult = await generateResponse.json();
-
-      if (!generateResult.ok) {
-        throw new Error(generateResult.error || "Failed to generate strategy");
-      }
-
-      setGeneratedStrategy(generateResult);
-
-      // Step 2: Run backtest with generated strategy
+      // Build the backtest request payload
       const backtestPayload: any = {
         tickers: params.tickers,
         startDate: params.startDate,
         endDate: params.endDate,
         mode: params.mode,
+        portfolio: params.portfolio,
       };
 
       if (params.mode === "dsl") {
-        backtestPayload.dsl = generateResult.dsl;
+        backtestPayload.dsl = params.dsl;
       } else {
-        backtestPayload.code = generateResult.code;
+        backtestPayload.ml = params.ml;
       }
 
       const backtestResponse = await fetch("/api/strategy/run", {
@@ -131,7 +105,7 @@ export default function BacktesterPage() {
 
         {/* Strategy Form */}
         <div className="mb-8">
-          <StrategyForm onRunStrategy={handleRunStrategy} loading={loading} />
+          <StrategyFormNew onRunStrategy={handleRunStrategy} loading={loading} />
         </div>
 
         {/* Error Display */}
@@ -161,7 +135,7 @@ export default function BacktesterPage() {
 
         {/* Results */}
         {results && (
-          <BacktestResults results={results} generatedStrategy={generatedStrategy || undefined} />
+          <BacktestResultsNew results={results} />
         )}
 
         {/* Help Section */}

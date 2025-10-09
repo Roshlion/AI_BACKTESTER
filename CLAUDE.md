@@ -1,344 +1,609 @@
-Here’s a single **copy-paste CLAUDE prompt** for your **FeatureComponent** branch. It folds in *everything* we discussed (DSL tickers fix, ML wiring + loading/disable, auto example prompts per mode, **Manual Checker** toggle with prefilled DSL/ML scripts, ML sector select, expanded tests incl. API + run flows, and deep docs on AWS/ECR/App Runner/S3 parquet + manifests). **Make all changes in one commit.**
+Alright — here’s your **single, giant, copy-paste Codex prompt** to overhaul the repo exactly as we discussed. It’s tailored to your current **FeatureComponent** branch structure, uses **S3-only** data (no local reads for market data), and assumes the **container has S3 permissions**. It keeps the **manual-first Strategy Lab** with an **“Generate with AI”** autofill button, adds a full **portfolio simulation layer**, and cleanly splits **rule-based backtests** (TS engine or Python engine behind a flag) and **ML** (Python in Docker). It also includes **quick local commands/scripts** for Docker + S3 and **documentation/test plans**.
 
 ---
 
-# CLAUDE.md — Final sweep: DSL tickers fix, ML Generate/Run, loading guards, Manual Checker, sectors, tests, and docs (single commit)
+# 🔧 CODEX MASTER PROMPT — AI_BACKTESTER Overhaul (Manual-First, S3-Only, Python/TS Hybrid, Portfolio Sim, ML in Docker)
 
-You’re on branch **FeatureComponent**. Apply all changes below. Keep current style/structure (Next.js App Router, Zustand, Vitest + RTL). **Single commit only** at the end.
+**Important constraints (do not violate):**
 
----
+* **Data source:** **S3-only** via `S3_BASE` (HTTP GET to parquet/json). **No local filesystem reads** for market data.
+* **Containers:** Requests to the ML/backtest container **have S3 access** via IAM/creds. Use that when needed inside Python (e.g., boto3 or HTTPS fetches).
+* **Branch:** Work in the **FeatureComponent** branch. Keep `main` untouched.
+* **Keep existing integration points** and file structure wherever reasonable. Improve, don’t break.
+* **Default UX:** **Manual builder first** (DSL & ML). **“Generate with AI”** is a **button** that **autofills** the manual forms (doesn’t run automatically).
 
-## 0) Objectives (recap)
+## 0) Repository context you can rely on (paths & behavior)
 
-* Fix **DSL** run failing with “tickers array required”.
-* Make **ML** tab fully functional (Generate → code/hyperparams, Run → metrics/preds/logs).
-* Add **loading/disable** states to prevent double-click & concurrent runs.
-* **Auto example prompts** swap when switching between **DSL** and **ML** modes.
-* Add **Manual Checker** toggle: same page, *Generate* buttons disabled, prefilled sample **DSL** and **ML** scripts + editable hyperparams; can still **Run**.
-* Add **sector selection** in ML panel (union with chosen tickers, deduped).
-* Add **tests** for API routes, UI payload correctness, Manual Checker behavior, sector expansion, loading guards, and smoke running of samples.
-* Expand **README.md**, **DOCUMENTATION.md**, **agents.md** with AWS (Docker/ECR/App Runner), S3 parquet layout & manifests, envs, runbooks, and test plans.
+(Use these references as ground truth while editing.)
 
----
+* **Docs:**
 
-## 1) Types (shared contracts)
+  * `README.md` — user overview (Dashboard, Strategy Lab, Data Warehouse) and S3-first flow.
+  * `DOCUMENTATION.md` — technical flow: S3 → Next.js APIs → UI; **no local FS**; manifest `index.json`.
+  * `Agents.md`, `CLAUDE.md` — agent instructions and “final-sweep” prompts.
 
-**Create:** `types/strategy.ts`
+* **APIs (Next.js):**
 
-```ts
-export type StrategyMode = 'dsl' | 'ml';
+  * `app/api/index/route.ts` — reads manifest from `${S3_BASE}/index.json`
+  * `app/api/local-data/route.ts` — fetches ticker data from S3 within a date range
+  * `app/api/strategy/generate/route.ts` — OpenAI DSL/ML generation (returns **DSL JSON** or **Python code string**)
+  * `app/api/strategy/run/route.ts` — runs backtests (currently: DSL in TS engine; ML via `mlClient` remote or local)
+  * `app/api/strategy/ping/route.ts`, `app/api/health/route.ts`, `app/api/ml/health/route.ts` — health checks.
 
-export interface DateRange { startDate?: string; endDate?: string; }
+* **Libs / Engine:**
 
-export interface DslIndicators {
-  sma?: { periods: number[] };
-  ema?: { periods: number[] };
-  rsi?: { enabled: boolean; period?: number };
-  macd?: { enabled: boolean; fast?: number; slow?: number; signal?: number };
-}
+  * `lib/safeParquet.ts` — **S3-first** fetch; map Parquet/JSON schemas; `readTickerRange(ticker,start,end)`.
+  * `lib/strategy-engine.ts` — **DSL backtester in TS** (MACD/RSI/SMA/EMA), returns `stats,trades,equity`.
+  * `lib/ml-client.ts` — **ML API client**: `ML_API_URL` remote, or `ALLOW_LOCAL_PY=1` local fallback stubs.
 
-export interface StrategyGenerateReq extends DateRange {
-  mode: StrategyMode;
-  tickers: string[];                 // required (>=1)
-  indicators?: DslIndicators;        // DSL only
-  prompt?: string;                   // DSL or ML
-  hyperparams?: Record<string, any>; // ML only
-}
+* **UI:**
 
-export interface StrategyRunReq extends DateRange {
-  mode: StrategyMode;
-  tickers: string[];                 // required
-  dsl?: string;                      // DSL mode
-  ml?: { code?: string; hyperparams?: Record<string, any> }; // ML mode
-}
-```
+  * `components/strategy-form.tsx` — prompt + DSL/ML toggle + (old) run flow
+  * `components/backtest-results.tsx` — equity chart + per-ticker stats/trades
+  * `components/strategy/HyperparamForm.tsx`, `ModelCard.tsx`, `CodePane.tsx` — ML UI bits
+  * `components/MultiTickerChart.tsx`, `components/ticker-selector.tsx`
+  * Dashboard: `app/(shell)/dashboard/*.tsx` (fetch tickers; Quick Actions; chart)
 
 ---
 
-## 2) API: validate & unify (fix “tickers array required”)
+## 1) Goal & High-Level Plan
 
-**Edit:** `app/api/strategy/generate/route.ts` and `app/api/strategy/run/route.ts`
+### What we’re building
 
-* Parse body as `StrategyGenerateReq` / `StrategyRunReq`.
-* If `!Array.isArray(body.tickers) || body.tickers.length===0` → `return NextResponse.json({ error:'tickers array required' }, { status: 400 })`.
-* **DSL** path: accept `prompt` and/or `indicators`; keep existing DSL logic but consume values from the unified payload.
-* **ML** path: forward to `process.env.ML_API_URL`:
+* A **manual-first Strategy Lab** (two tabs: **DSL** & **ML**) with:
 
-  * Generate → `POST {base}/ml/generate`
-  * Run → `POST {base}/ml/run`
-  * `base = process.env.ML_API_URL?.replace(/\/+$/,'')`, return 501 if unset.
+  * **DSL Builder** (rule blocks for SMA/EMA cross, RSI thresholds, MACD crosses; more later).
+  * **Portfolio Panel** (starting cash, initial positions, leverage, costs, sizing, rebalance, constraints).
+  * **ML Builder** (model selection + hyperparams; template-generated Python; advanced **code editor**).
+  * **“Generate with AI”** (button): takes a prompt → **autofills manual forms** (DSL rules or ML model+params or code). The user can tweak before running.
 
-Add small helpers (optional) for clean fetch:
+* **Backtest execution paths**:
 
-```ts
-async function proxyMl(path: string, body: any) {
-  const base = process.env.ML_API_URL?.replace(/\/+$/,'');
-  if (!base) return { status: 501, json: { error: 'ML_API_URL not set' } };
-  const r = await fetch(`${base}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    // optionally: next: { revalidate: 0 }
-  });
-  const j = await r.json().catch(() => ({}));
-  return { status: r.status, json: j };
-}
-```
+  * **DSL (Rule-based):**
+
+    * Default: **TS engine** (`lib/strategy-engine.ts`) for speed & parity.
+    * Optional: **Python engine** (new microservice) via env flag `USE_PY_BACKTESTER=1`.
+  * **ML:** **Python** (Docker) templates or custom code, invoked via **HTTP** `ML_API_URL` from Next.js.
+  * All market data loads **from S3** (`S3_BASE`) — **no local reads**.
+  * Containers have S3 access via IAM or env; use that for any internal fetches as needed.
+
+* **Outputs:** Full **portfolio-aware** results: trade ledger, daily equity, attribution, risk metrics.
+
+* **Everything documented & tested** (Vitest + Pytest) with **S3-only** in mind.
 
 ---
 
-## 3) Client wiring: always send `tickers: string[]`
+## 2) Environment Variables & S3-Only Contract
 
-**Edit:** Strategy Lab client (e.g. `app/(shell)/strategy/StrategyClient.tsx` and any sub-panels).
-
-* Pull `tickers: string[]` & `dateRange` from store.
-* **All** generate/run calls (DSL & ML) must include `tickers` array (never a single string).
-
----
-
-## 4) Loading/disable (single-flight) for DSL & ML
-
-**Create:** `lib/useAsyncAction.ts`
-
-```ts
-import * as React from 'react';
-export function useAsyncAction<T extends any[]>(fn: (...a: T) => Promise<any>) {
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string|null>(null);
-  const run = React.useCallback(async (...a: T) => {
-    if (loading) return;
-    setLoading(true); setError(null);
-    try { return await fn(...a); }
-    catch (e:any) { setError(e?.message || 'Action failed'); throw e; }
-    finally { setLoading(false); }
-  }, [fn, loading]);
-  return { run, loading, error, setError };
-}
-```
-
-**Apply:**
-
-* Wrap **DSL Generate**, **DSL Run**, **ML Generate**, **ML Run** with `useAsyncAction`.
-* Buttons show `Generating…` / `Running…`; **disabled** while loading or ML offline (for ML side).
-* Disable form inputs that would mutate a pending run (tickers/sectors/dates) during **Run**.
-* Add a slim top **progress bar** (CSS) or overlay while loading.
-* Render inline error text if `{ error }` returned.
-
----
-
-## 5) ML tab: fully functional
-
-**Generate →** `/api/strategy/generate` with:
-
-```ts
-{ mode:'ml', tickers, ...dateRange, prompt, hyperparams }
-```
-
-On success:
-
-* Populate **CodePane** with returned code (`j.code || j.python || ''`).
-* Sync **hyperparams** (merge defaults & returned values).
-* Clear errors.
-
-**Run →** `/api/strategy/run` with:
-
-```ts
-{ mode:'ml', tickers, ...dateRange, ml: { code, hyperparams } }
-```
-
-On success:
-
-* Show **metrics** (key/value list), **predictions** preview table (e.g., timestamp, symbol, y_pred, prob?), and optional **logs** in a right-side results pane.
-
-**Remove** any “in development” banners; keep **ML health badge** in header (green/red), and **disable** ML actions if offline.
-
----
-
-## 6) Auto example prompts swap with mode
-
-**Edit:** the helper section component at bottom of Strategy Lab.
-
-* Two arrays:
-
-```ts
-const DSL_EXAMPLES = [
-  'Momentum cross: Buy EMA(20)>SMA(50); sell on cross-down.',
-  'RSI mean reversion: Buy RSI<30; exit RSI>55 or after 10 bars.'
-];
-const ML_EXAMPLES = [
-  'RandomForest on OHLCV + RSI/MACD with 60-day window; predict next-day up/down.',
-  'XGBoost with volatility features; optimize F1; threshold=0.55 for buys.'
-];
-```
-
-* When tab = **DSL**, show DSL examples; when tab = **ML**, show ML examples.
-* Clicking an example **fills the active mode’s main prompt** textarea/editor.
-
----
-
-## 7) **Manual Checker** toggle (top-right)
-
-* Header contains a **Manual checker** switch (`manual:boolean` in state).
-* In **Manual** mode:
-
-  * Keep same page/UX, but **Generate** buttons are disabled/greyed.
-  * If editors are empty on entering Manual:
-
-    * Prefill **DSL** editor with a *valid* sample strategy (use your accepted DSL syntax).
-    * Prefill **ML** editor with a runnable **Python** template (imports, feature windowing, basic model fit/predict) and default **hyperparams**.
-  * **Run Backtest / Run ML** remain enabled (with loading guards).
-* Note in UI (small hint) that Manual mode skips AI generation by design.
-
----
-
-## 8) ML **sector selection**
-
-**Data source priority:**
-
-1. If `process.env.S3_BASE` available, try `${S3_BASE}/sectors.json`.
-2. Fallback to local `public/data/sectors.json`.
-
-**Format:**
-
-```json
-{
-  "Technology": ["AAPL","MSFT","NVDA"],
-  "Financials": ["JPM","BAC","C"]
-}
-```
-
-**Add component:** `components/strategy/SectorSelect.tsx`
-
-* Multi-select sectors; show chips with counts.
-* On change, compute **union** of sector tickers and manually selected tickers → **dedupe**.
-* Store additions in Zustand: `selectedSectors: string[]`, `setSelectedSectors`.
-* Payload `tickers[]` always uses this **union**.
-
----
-
-## 9) Tests (Vitest + RTL) — add comprehensive coverage
-
-**a) API route tests** (invoke route handlers directly)
-
-* **File:** `tests/api-strategy-generate.test.ts`
-
-  * 400 if `tickers` missing/empty.
-  * DSL path returns 200 with mock OpenAI/DSL generator (stub internal fn or bypass).
-  * ML path proxies to `ML_API_URL` (mock `global.fetch`) and bubbles status/body.
-* **File:** `tests/api-strategy-run.test.ts`
-
-  * 400 if `tickers` missing/empty.
-  * DSL path consumes `dsl` and returns 200 in happy path (stub backtester).
-  * ML path proxies to `/ml/run` and returns metrics/preds.
-
-**b) Strategy Lab UI tests**
-
-* **File:** `tests/strategy-dsl-payload.test.tsx`
-
-  * Select 2 tickers; click **Run DSL**; assert `fetch` body contains `tickers: ["AAPL","MSFT"]`.
-* **File:** `tests/strategy-ml-generate-run.test.tsx`
-
-  * Mock `/api/strategy/generate` → `{ code:"print('ok')", hyperparams:{ n_estimators:100 } }`. Click **Generate**; CodePane updates; hyperparam control shows 100; button disabled while loading.
-  * Mock `/api/strategy/run` → `{ metrics:{ accuracy:0.7 }, predictions:[{ts:"2024-01-01",symbol:"AAPL",y_pred:1}] }`. Click **Run ML**; metrics rendered; 1 prediction row present.
-* **File:** `tests/strategy-manual-mode.test.tsx`
-
-  * Toggle **Manual checker**; **Generate** buttons disabled; sample DSL/ML code present (non-empty).
-  * Run buttons still enabled; clicking triggers single request (ensure single-flight).
-* **File:** `tests/strategy-sectors.test.tsx`
-
-  * Provide mock `sectors.json` (jest/vitest mock for fetch). Select “Technology” + “AAPL” manually; payload includes deduped union.
-* **File:** `tests/strategy-loading-guards.test.tsx`
-
-  * Click **Run** twice quickly → only one network call fires; button text flips to `Running…`.
-* **File:** `tests/strategy-health-badge.test.tsx`
-
-  * Mock `/api/ml/health` ok → badge “ML online”; error → “ML offline” and ML actions disabled with tooltip.
-
-> Keep tests fast by mocking `fetch` and any heavy components. Use `data-testid`/`aria-label`s consistently (we already added specific labels earlier).
-
----
-
-## 10) Docs updates
-
-**.env.example**
+**Honor these variables (and only these data paths for market data):**
 
 ```
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+# S3 data (read-only HTTP)
+S3_BASE=https://<your-bucket>.s3.amazonaws.com/<prefix>
 
-# S3 parquet (public discovery)
-AWS_REGION=us-east-1
-AWS_BUCKET=ai-backtester-data-rosh
-AWS_PREFIX=prod
-S3_BASE=https://ai-backtester-data-rosh.s3.amazonaws.com/prod
+# OpenAI
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4o-mini
 
 # ML service
-ML_API_URL=https://<your-app-runner-domain>/
-# optional (local): ALLOW_LOCAL_PY=0
+ML_API_URL=https://<your-app-runner-or-ecs-service>    # remote Python microservice
+ALLOW_LOCAL_PY=1                                        # dev-only local mode (optional)
+
+# Strategy runner
+PYTHON_BIN=python                                       # optional local runner
+AI_TMP_DIR=.ai_tmp                                      # optional temp dir
+
+# Switch DSL execution path (TS default, Python if set)
+USE_PY_BACKTESTER=0|1
 ```
 
-**README.md** (append/replace sections as needed)
+**Rules:**
 
-* **Strategy Lab (DSL & ML):**
-
-  * Tabs, **ML health badge** (`/api/ml/health`), auto example prompts.
-  * **Manual Checker** mode (Generate disabled; prefilled scripts; Run allowed).
-  * **Loading/disable** behavior to prevent double-clicks.
-* **Sectors (ML):** Select sectors or stocks; union + dedupe; `sectors.json` source (S3_BASE then local).
-* **Quick test plan:** how to run `npm test`, what to expect (key passing assertions).
-* **Environment vars:** list and meanings.
-* **Troubleshooting:** CORS on ML, 400 tickers error, ML_API_URL unset (501).
-
-**DOCUMENTATION.md**
-
-* **API contracts** (`/api/strategy/generate`, `/api/strategy/run`)
-
-  * Request/response for DSL & ML; error shape `{ error: string }`.
-* **Data layout:** S3 parquet per symbol at `s3://<bucket>/<prefix>/<SYMBOL>.parquet`; optional `sectors.json` manifest; future sector expansion.
-* **AWS Deployment:** Docker → ECR → App Runner. Roles (`AppRunnerECRAccessRole`, `AppRunnerInstanceS3ReadRole`), env vars, health check `/health`, scaling hints.
-* **Runtime model:** ML service reads S3 parquet via role with S3 read.
-* **Test coverage map:** list the test files and what they verify.
-
-**agents.md**
-
-* **Purpose & scope:** DSL and ML backtesting agents; what state/store to touch.
-* **State/UX contract:** Single-flight, health polling, disabling rules, Manual checker behavior.
-* **Templates:** DSL sample, ML Python template, hyperparams schema expectations.
-* **Data sources:** S3 parquet layout; `sectors.json` contract and priority (S3 then local).
-* **AWS runbook:** How the Docker/ECR/App Runner pieces fit; redeploy steps; env changes.
-* **Diagnostics:** What to log/return from ML service (`metrics`, `predictions`, optional `logs`).
+* Market data is fetched by **Next.js** via `lib/safeParquet.ts` from **`${S3_BASE}/index.json`** and **`${S3_BASE}/${TICKER}.parquet|.json`**.
+* **Python service** should also fetch via HTTPS from S3 (or use IAM if it wants to list), but **must accept ticker + date range** and **must not require local data files**.
+* When Next.js calls the ML/Backtest service, assume the **container has S3 permissions** (IAM) — okay to fetch directly.
 
 ---
 
-## 11) Small UI affordances (consistency)
+## 3) UI Overhaul — Manual-First Strategy Lab
 
-* Ensure **aria-label**/`data-testid` on:
+### 3.1 Create/Refactor Components
 
-  * Generate/Run buttons for DSL & ML (distinct).
-  * Health badge (`ml-health-badge`).
-  * Sector chips and sector multi-select.
-  * Manual checker toggle.
-  * Code editors (`dsl-editor`, `ml-editor`).
-* Tooltips on disabled ML actions when offline: “ML service offline.”
+* **New** `components/strategy/DSLBuilder.tsx`
+
+  * Add/Remove **Rule Blocks**:
+
+    * **sma_cross / ema_cross**: `{ fast, slow, enter, exit }`
+    * **macd_cross**: `{ fast, slow, signal, enter, exit }`
+    * **rsi_threshold**: `{ period, low?, high?, enter, exit }`
+  * Each rule gets UI **inputs with defaults** (use `normaliseDsl` defaults in `lib/strategy-engine.ts` as ground truth for ranges/defaults).
+
+* **New** `components/strategy/PortfolioPanel.tsx`
+
+  * Inputs:
+
+    ```
+    startingCash: number
+    initialPositions?: Record<string, number>  // shares
+    leverage: number
+    maxGross?: number
+    commissionFixed?: number
+    commissionPct?: number     // 0.0005 = 5 bps
+    slippageBps?: number       // 2 = 2 bps
+    borrowRateShort?: number   // annualized; apply daily
+    allowShort?: boolean
+    sizing:
+      - fixed_dollar { amount }
+      - percent_of_equity { pct }
+      - risk_per_trade_pct { pct, atr_lookback }
+    maxPositions?: number
+    maxWeightPerTicker?: number
+    rebalance?: "none"|"daily"|"weekly"|"monthly"
+    rebalanceDriftPct?: number
+    stopLossPct?: number
+    takeProfitPct?: number
+    benchmark?: string
+    ```
+  * Validate, persist to store, and pass through to the **run request**.
+
+* **New** `components/strategy/MLBuilder.tsx`
+
+  * **Model select** (all major families):
+
+    * Linear/Logistic Regression, Ridge/Lasso/ElasticNet
+    * DecisionTree, RandomForest, ExtraTrees
+    * XGBoost, LightGBM (optional if available), CatBoost (optional)
+    * SVM (SVC/SVR), KNN (KNeighbors), MLP (scikit-learn)
+  * **Hyperparam inputs** (reuse `HyperparamForm.tsx` & `uiSchema`); add train-window, feature choices (OHLC/returns/indicators).
+  * **Code editor** (advanced): show/edit generated Python; switch to “custom code mode” once edited.
+
+* **Update** `components/strategy-form.tsx`
+
+  * Keep **DSL/ML toggle**. Remove the old “manual vs AI” checkbox.
+  * **Manual UI** is always visible for the chosen tab (DSLBuilder + PortfolioPanel, or MLBuilder + PortfolioPanel).
+  * Add **“Generate with AI”** button (Sparkles icon): opens modal with **prompt textarea**.
+
+    * **On submit:** call `/api/strategy/generate` with `{ mode, prompt, tickers, startDate, endDate }`.
+    * **If DSL:** parse `dsl` and **autofill** DSLBuilder (name + rules).
+    * **If ML:** inspect `code` to detect model if possible; otherwise fill **code editor** and basic params; keep editable.
+    * Do **not** run automatically; user still clicks **Run Backtest**.
+  * **Run Backtest** button:
+
+    * Build payload: `{ mode, tickers[], startDate, endDate, dsl?, ml?, portfolio }`.
+    * Call `/api/strategy/run`.
+    * Show spinner (“Loading… Running backtest…”).
+    * Render `BacktestResults` on success; show errors otherwise.
+
+* **Update** `components/backtest-results.tsx` to support **portfolio outputs**:
+
+  * **Show at top:**
+
+    * Starting cash, ending equity, return %, CAGR, volatility, Sharpe, Sortino, max drawdown, exposure, turnover, # trades, hit rate, avg win/loss.
+  * **Tabs:**
+
+    * **Equity Curve** (daily NAV)
+    * **Trade Ledger** (time, ticker, side, qty, fill_price, fees, slippage, PnL)
+    * **Per-Ticker Attribution** (PnL, hit rate, average trade, contribution)
+    * **Risk** (drawdown curve, rolling volatility, rolling Sharpe)
+  * Accept a unified response shape for both TS/Python engines (see **Section 5** API contracts).
+
+* **Dashboard integration** (`app/(shell)/dashboard/*`):
+
+  * Allow multi-select tickers & date range; keep “Generate Strategy with this” button.
+  * Link to `/backtester?tickers=AAPL,MSFT&start=2022-01-01&end=2024-12-31` and **pre-fill** Strategy Lab inputs.
 
 ---
 
-## 12) Finalize (single commit)
+## 4) Backend — Execution Paths & Flags
 
-Run and verify:
+### 4.1 Keep TS DSL engine (default), add Python DSL engine (flag)
 
-```bash
-npm run test
-npm run typecheck
-npm run build
+* In `app/api/strategy/run/route.ts`:
+
+  * Add env flag `USE_PY_BACKTESTER`:
+
+    * If `mode === "dsl"` **and** `USE_PY_BACKTESTER=1`, call **Python service** (see **4.2**).
+    * Else, run existing **TS engine** (`runBacktest`) as today.
+  * **Always pass `portfolio` config**; TS engine should **apply portfolio sim** (see **4.3**) or Python engine should, depending on path.
+  * **ML path** remains via `mlClient.trainPredict(...)` (implemented to call Python service).
+
+### 4.2 Python microservice (Docker) — endpoints
+
+Add/extend the Python service (container you already have). If you prefer, fold into your existing ML service (`ML_API_URL`).
+
+**New/Updated endpoints:**
+
+* `POST /backtest/dsl`
+  **Input:**
+
+  ```
+  {
+    "tickers": ["AAPL","MSFT"],
+    "start": "YYYY-MM-DD",
+    "end": "YYYY-MM-DD",
+    "dsl": { "name": "...", "rules": [ ... ] },
+    "portfolio": { ... }   // see PortfolioPanel schema
+  }
+  ```
+
+  **Behavior:**
+
+  * For each ticker: fetch OHLCV **via HTTPS** from `${S3_BASE}` or use IAM to read S3 (either is fine)
+  * Compute rule signals (SMA/EMA/MACD/RSI) → position targets → portfolio simulator (below)
+  * Return per-ticker stats + equity + trades, and summary (portfolio-level metrics)
+
+* `POST /ml/train-predict`   (**keep** current route for `mlClient.trainPredict`)
+  **Input:**
+
+  ```
+  {
+    "tickers": [...],
+    "start": "YYYY-MM-DD",
+    "end": "YYYY-MM-DD",
+    "modelType": "RandomForestClassifier" | ...,
+    "code": "<python or empty if using template>",
+    "hyperparams": { ... },
+    "portfolio": { ... }       // apply same sim after predictions -> trades
+  }
+  ```
+
+  **Behavior:**
+
+  * If `code` provided → run that (sandboxed subprocess).
+  * Else render **template** for `modelType` with `hyperparams` and a **simple trade rule** (e.g., predict next-day up → long).
+  * Read OHLCV from S3 via HTTPS or boto3; compute features; train/test; generate **daily signals**; feed **portfolio simulator**.
+  * Return same output shape as DSL.
+
+* `GET /health` → `{ status: "ok" }`
+
+**Security/runtime:**
+
+* Constrain subprocess: **timeout**, **CPU/mem limits**, **kill on exceed**.
+* Use `requests`/`s3fs`/`boto3` for data; **do not** expect local files.
+* Provide `requirements.txt` (pandas, numpy, scikit-learn, xgboost, lightgbm optional, ta/pandas-ta optional).
+
+### 4.3 Portfolio Simulator (TS & Python parity)
+
+**Daily loop (per portfolio, across tickers):**
+
+1. Compute **signals** → desired **target weights** or **orders** per ticker.
+2. **Sizing**:
+
+   * `fixed_dollar`: $ per position
+   * `percent_of_equity`: % of NAV
+   * `risk_per_trade_pct`: position sized so ATR-stop risk equals % of NAV
+3. Enforce **constraints**: `maxPositions`, `maxWeightPerTicker`, `allowShort`, `maxGross`, `leverage`.
+4. **Execution:**
+
+   * Market-on-close fills; apply **commission** (`fixed + pct * notional`) and **slippage** (`bps * notional / 10_000`).
+   * **Short borrow** = `short_notional * borrowRateShort/252` per day.
+5. Update **cash**, **positions**, **equity (NAV)**.
+6. Apply **stopLossPct / takeProfitPct** triggers.
+7. **Rebalance** on schedule or **drift threshold**.
+8. Record **trade ledger** entries.
+
+**Outputs (per run):**
+
+```
+{
+  ok: true,
+  summary: {
+    mode: "dsl" | "ml",
+    startDate, endDate,
+    startingCash, endingEquity, totalReturnPct, CAGR,
+    volatilityPct, sharpe, sortino, maxDrawdownPct,
+    exposurePct, turnoverPct,
+    totalTrades, winRatePct, avgWinPct, avgLossPct,
+    bestDayPct, worstDayPct,
+    benchmark?: { totalReturnPct, alphaPct, beta }
+  },
+  perTicker: [
+    {
+      ticker,
+      stats: { totalReturnPct, trades, winRatePct, avgTradePct, contributionPct },
+      trades: [{ date, side, qty, fillPrice, fees, slippage, pnlPct }],
+      equity: [{ date, nav }]
+    },
+    ...
+  ],
+  portfolioDaily: [{ date, nav, drawdownPct, exposurePct }],
+  logs: [ ... ]
+}
 ```
 
-**Stage all**, then **one commit** only:
+Unify response shape for both TS and Python paths so `backtest-results.tsx` renders identically.
+
+---
+
+## 5) API Contracts (front↔back)
+
+### 5.1 `/api/strategy/generate` (Next.js → OpenAI)
+
+* **Request:** `{ mode: "dsl" | "ml", prompt, tickers[], startDate?, endDate? }`
+* **Response (DSL):** `{ ok: true, mode:"dsl", dsl: { name, rules:[...] } }`
+* **Response (ML):** `{ ok: true, mode:"ml", code: "<python>", modelType? }`
+* **UI behavior:** Fill DSLBuilder or MLBuilder fields/code and **stop** (do not auto-run).
+
+### 5.2 `/api/strategy/run` (Next.js)
+
+* **Request (DSL/TS default):**
+
+  ```
+  {
+    mode: "dsl",
+    tickers, startDate, endDate,
+    dsl: { name, rules:[...] },
+    portfolio: { ... }
+  }
+  ```
+* **Request (DSL/Python if `USE_PY_BACKTESTER=1`):** same body; Next.js proxies to Python `/backtest/dsl`.
+* **Request (ML):**
+
+  ```
+  {
+    mode: "ml",
+    tickers, startDate, endDate,
+    ml: { modelType?, code?, hyperparams: { ... } },
+    portfolio: { ... }
+  }
+  ```
+
+  Next.js calls Python `/ml/train-predict`.
+* **Response (both):** unified as in **4.3 Outputs**.
+
+---
+
+## 6) Implementation Steps (edits to make)
+
+### 6.1 UI & State
+
+* Create `components/strategy/DSLBuilder.tsx`
+
+* Create `components/strategy/PortfolioPanel.tsx`
+
+* Create `components/strategy/MLBuilder.tsx`
+
+* Refactor `components/strategy-form.tsx`:
+
+  * Remove requirement for `prompt` on submit.
+  * Insert DSLBuilder/MLBuilder + PortfolioPanel.
+  * Add “Generate with AI” modal → call `/api/strategy/generate` → autofill.
+  * Validate inputs; then call `/api/strategy/run` with full payload.
+
+* Update `components/backtest-results.tsx`:
+
+  * Support `summary`, `perTicker`, `portfolioDaily` with new fields.
+  * Tabs: Equity, Trades, Attribution, Risk.
+
+* Update Dashboard:
+
+  * Allow multi-ticker + date selection.
+  * Link to backtester with `tickers`/`start`/`end` params and **pre-fill**.
+
+### 6.2 Next.js APIs
+
+* `app/api/strategy/generate/route.ts`:
+
+  * Keep as is; ensure it returns **normalized DSL** (uses `normaliseDsl`) and **python code** for ML.
+  * (Optional) add `tickers/start/end` in the OpenAI “system prompt” for better hints.
+
+* `app/api/strategy/run/route.ts`:
+
+  * Extend schema to accept `portfolio` object in both modes; default sensible values.
+
+    * If **TS DSL** path: integrate **portfolio simulator** in TS (see 6.3).
+    * If `USE_PY_BACKTESTER=1`: forward to Python `/backtest/dsl` with same body.
+  * **ML path:** continue to use `mlClient.trainPredict`; include `portfolio` in body. Ensure `mlClient` forwards it.
+
+* `lib/ml-client.ts`:
+
+  * Extend requests to include `portfolio`.
+  * Provide `generate`, `trainPredict`, `healthCheck` against `ML_API_URL`.
+  * Keep local dev stubs minimal.
+
+### 6.3 TS Portfolio Simulator (for TS DSL path)
+
+* Create `lib/portfolio.ts` with:
+
+  * Types: `PortfolioConfig`, `PositionSizing`, `Trade`, `PortfolioDaily`, `PortfolioStats`.
+  * `simulatePortfolio({ rowsByTicker, signalsByTicker, portfolioConfig }) → { perTicker, portfolioDaily, summary }`
+  * Implement the equations in **4.3** (cash, fees, slippage, NAV, risk metrics).
+  * Integrate with `runBacktest`:
+
+    * `runBacktest` can remain as **signal generator** (enter/exit arrays) or produce trades;
+    * Prefer producing **signals** (enter/exit vectors), then portfolio sim consumes them.
+    * If easier short-term, use existing `trades/equity` from `runBacktest` and inflate into portfolio terms (but full fidelity wants target weights).
+
+* Update `run` route to use `simulatePortfolio` outputs.
+
+### 6.4 Python Service
+
+* Add endpoints:
+
+  * `POST /backtest/dsl` — parse DSL, compute signals, run **same** portfolio sim logic as TS.
+  * `POST /ml/train-predict` — template or custom code → predictions → signals → portfolio sim.
+
+* Implement indicator set (SMA/EMA/MACD/RSI) and sim; use pandas/numpy (and ta/pandas-ta if desired).
+
+* Enforce timeouts and limits for subprocess (`code` path).
+
+* Output **exact JSON shape** described in **4.3**.
+
+* **Model templates** (Jinja2 or string format):
+
+  * RandomForest (clf/reg), ExtraTrees, XGBoost, LightGBM (optional), Logistic/Linear, DecisionTree, SVM, KNN, MLP.
+  * Accept `hyperparams` and `train_window` (days).
+  * Features: close/returns/rolling stats/indicators (basic set), deterministic seeds.
+
+### 6.5 Tests
+
+**Vitest (TS):**
+
+* `lib/safeParquet.spec.ts` — schema normalization (odd field names, decimals, bigint)
+* `lib/strategy-engine.spec.ts` — SMA/EMA/RSI/MACD signal correctness on toy data
+* `lib/portfolio.spec.ts` — portfolio math (cash/fees/slippage/leverage/short borrow)
+* `app/api/strategy/run.spec.ts` — DSL request → summary/perTicker shape (mock S3 fetch)
+* E2E smoke: call `/api/strategy/generate` (mock OpenAI) → fill DSL → `/api/strategy/run` (TS path) → assert response keys
+
+**PyTest (Python service):**
+
+* `tests/test_indicators.py`, `test_portfolio.py`, `test_dsl_backtest.py`, `test_ml_templates.py`
+* Tiny fixtures (5–20 rows) to assert trades and NAV.
+* Integration: call `/backtest/dsl` and `/ml/train-predict` with fixture tickers (mock S3 fetch with requests_mock or moto if using boto3), assert output schema.
+
+**Optional integration tests** (only if Python available locally):
+
+* From Next.js, run `mode: "ml"` with trivial code that prints fixed JSON → ensure `/api/strategy/run` path parses result.
+
+---
+
+## 7) Documentation Updates
+
+* **README.md**
+
+  * Update **Features** to: Manual Strategy Builder (DSL/ML), AI Autofill, Portfolio Simulator, S3-only data, ML in Docker.
+  * Update **Quick Start**:
+
+    * `docker compose up` starts Next.js and Python service.
+    * `.env` example using **only S3_BASE** for data.
+  * Update **Usage**:
+
+    * Strategy Lab: Build DSL or ML manually; optionally “Generate with AI”; then Run.
+    * Explain Portfolio panel inputs and their effects.
+  * State **deployment**: Next.js on Vercel; Python service on AppRunner/ECS. ML/DSL Python endpoints accept S3-based runs.
+
+* **DOCUMENTATION.md**
+
+  * Clarify **S3-only** flow and **no local FS** invariant.
+  * Add **API contracts** (Section 5) plus response schema.
+  * Add **Portfolio simulator math** and metrics definitions (CAGR, Sharpe, Sortino, DD).
+  * Add **Testing** section with Vitest & PyTest commands.
+  * Add **Config flags**: `USE_PY_BACKTESTER`, `ML_API_URL`, `ALLOW_LOCAL_PY`.
+
+* **Agents.md / CLAUDE.md**
+
+  * New **agent instructions**:
+
+    * **Do not change data path**: always S3 for market data.
+    * Respect **manual-first UX**; AI only autofills.
+    * If editing run paths, keep **TS DSL** default unless `USE_PY_BACKTESTER=1`.
+    * For ML, always call Python service and return unified JSON.
+
+---
+
+## 8) Minimal local scripts & commands (Docker + S3)
+
+### S3 sanity checks (host)
 
 ```bash
-git add -A
-git commit -m "feat(strategy): unify payloads; fix DSL tickers; fully wire ML generate/run with loading & results; add Manual Checker; sector selection; comprehensive tests; and expanded docs for AWS/S3/ML. (single commit)"
+# List manifest and sample ticker via HTTPS
+curl -s "${S3_BASE}/index.json" | jq '.tickers | length, .[0:5]'
+curl -I "${S3_BASE}/AAPL.parquet"   # HEAD check
+curl -s "${S3_BASE}/AAPL.json" | head -n 2 || true
+
+# If AWS CLI (container IAM or local creds)
+aws s3 ls s3://ai-backtester-data-rosh/prod/
+aws s3 cp s3://ai-backtester-data-rosh/prod/index.json - | jq .
 ```
 
-Push to **FeatureComponent**.
+### Quick Python snippet (in container or host) to pull S3 via HTTPS (no SDK):
 
-**End.**
+```python
+import requests, pandas as pd, io
+import os
+S3_BASE = os.environ.get("S3_BASE")
+# Fetch manifest
+m = requests.get(f"{S3_BASE}/index.json").json()
+print("Tickers:", len(m.get("tickers", [])))
+# Fetch JSON rows for a ticker if available
+r = requests.get(f"{S3_BASE}/AAPL.json")
+if r.ok:
+    df = pd.read_json(io.StringIO(r.text))
+    print(df.head())
+```
+
+### Docker: run Python service locally (example)
+
+```bash
+# Build python service image
+docker build -t backtester-py ./python-service
+
+# Run with S3 env & IAM via local creds (or via task role in ECS)
+docker run --rm -p 8081:8081 \
+  -e S3_BASE="$S3_BASE" \
+  -e AWS_REGION=us-east-1 \
+  -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  backtester-py
+
+# Health check
+curl http://localhost:8081/health
+```
+
+### Next.js local
+
+```bash
+# .env.local: set S3_BASE, OPENAI_* (if using AI), ML_API_URL=http://localhost:8081
+pnpm i
+pnpm dev
+# Visit http://localhost:3000/backtester
+```
+
+---
+
+## 9) Acceptance Criteria (do not merge until all pass)
+
+* **Strategy Lab**
+
+  * **Default view is manual**. No prompt required to run.
+  * **DSL Builder**: can add/remove rules; normalize values; run on multiple tickers.
+  * **ML Builder**: select model, edit hyperparams, optional code editor; can run template or custom code.
+  * **“Generate with AI”**: Autofills manual forms (DSL rules or ML code/params), does **not auto-run**.
+  * **Portfolio Panel**: settings affect results (fees/slippage/leverage/short/etc.).
+
+* **Execution**
+
+  * **S3-only data** path confirmed (turn off any local file read).
+  * **DSL (TS)** produces unified output shape; **Python DSL** produces **identical shape** behind flag.
+  * **ML** runs via Python service; unified output shape; handles errors & timeouts gracefully.
+
+* **Results**
+
+  * Equity curve, trades ledger, attribution, risk metrics appear and are consistent across TS/Python paths (within expected tolerance).
+  * Multi-ticker summary stats make sense; per-ticker stats sum/average correctly.
+
+* **Docs & Tests**
+
+  * README/DOCS/Agents updated with new UX, APIs, sim model, test commands.
+  * Vitest & PyTest suites pass locally.
+  * Health endpoints OK; `/api/strategy/generate`, `/api/strategy/run` work for both DSL/ML flows.
+
+---
+
+## 10) Commit Plan
+
+* Commit 1: UI scaffolding (DSLBuilder, MLBuilder, PortfolioPanel) + StrategyForm refactor (manual-first + AI modal)
+* Commit 2: TS portfolio simulator + run route wiring + results component updates
+* Commit 3: Python service endpoints + model templates + portfolio sim parity
+* Commit 4: ml-client extension + run route Python proxy (`USE_PY_BACKTESTER`)
+* Commit 5: Tests (Vitest + PyTest) + smoke e2e
+* Commit 6: Docs (README, DOCUMENTATION, Agents/CLAUDE)
+* Commit 7: Cleanup (dead code, old toggles) + final polish
+
+Use descriptive messages, e.g.,
+`feat(strategy-lab): manual-first UI, AI autofill modal, portfolio sim, S3-only`
+
+---
+
+## 11) Extra Notes & Hints
+
+* **Indicator parity:** Keep indicator math equivalent between TS and Python (test with golden fixtures).
+* **AI prompt templates:** Keep existing `DSL_PROMPT_TEMPLATE` & `ML_PROMPT_TEMPLATE`, but you can add hints (e.g., “respond with JSON only”, include tickers/dates).
+* **Error UX:** Surface clear errors from Python service (timeout, parse errors, model import issues).
+* **Performance:** For multi-ticker, fetch in parallel but cap concurrency to avoid S3 throttling.
+* **Security:** In custom ML code mode, restrict runtime; disallow file writes/reads except stdout; kill on timeout.
+
+---
+
+**End of Codex Prompt.**
+Implement all items above in the **FeatureComponent** branch, honoring the **S3-only** data rule and keeping **manual-first UX** with optional **AI autofill**. After you finish, run all tests and update docs as specified.
