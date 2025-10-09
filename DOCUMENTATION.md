@@ -207,7 +207,100 @@ Local: `.env.local` (already present; keep unchanged)
 
 Vercel:
 - Add the same vars in Project Settings → Environment Variables (Production + Preview)
+- Add `ML_API_URL` pointing to your App Runner service
 - APIs must run on Node runtime (already configured)
+
+## 9a. ML Service (AWS App Runner)
+
+### S3 Data Layout
+- **Bucket**: `ai-backtester-data-rosh`
+- **Prefix**: `prod/`
+- **Layout**: Per-symbol Parquet files (`AAPL.parquet`, `MSFT.parquet`, etc.)
+- **Expected columns**: `date`/`time`, `open`/`high`/`low`/`close`/`volume` (+ engineered features if present)
+- **Date discovery**: ML service can scan Parquet metadata to determine min/max dates for selected tickers
+
+### Docker/ECR/App Runner Workflow
+
+**Build locally**:
+```bash
+cd services/ml
+docker build -t ai-backtester-ml:latest .
+```
+
+**Tag and push to ECR**:
+```bash
+# Authenticate
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT>.dkr.ecr.us-east-1.amazonaws.com
+
+# Tag
+docker tag ai-backtester-ml:latest <ACCOUNT>.dkr.ecr.us-east-1.amazonaws.com/ai-backtester-ml:latest
+
+# Push
+docker push <ACCOUNT>.dkr.ecr.us-east-1.amazonaws.com/ai-backtester-ml:latest
+```
+
+**App Runner configuration**:
+- **Image URI**: `<ACCOUNT>.dkr.ecr.us-east-1.amazonaws.com/ai-backtester-ml:latest`
+- **Port**: 8000
+- **Health check path**: `/health`
+- **Automatic deployments**: Enable to redeploy on new ECR pushes
+- **Roles**:
+  - **ECR access role**: Auto-created by App Runner wizard for pulling images
+  - **Instance role**: Create/attach with `AmazonS3ReadOnlyAccess` policy
+
+**Environment variables** (set in App Runner service configuration):
+```
+DATA_BUCKET=ai-backtester-data-rosh
+DATA_PREFIX=prod/
+DATA_LAYOUT=per-symbol
+AWS_REGION=us-east-1
+CORS_ORIGINS=https://<your-vercel-domain>
+```
+
+Note: `CORS_ORIGINS` is optional; defaults to `*` if not set. Set it to your Vercel domain to restrict access.
+
+### Health & Troubleshooting
+
+**Frontend health check**:
+- `/api/ml/health` proxies to App Runner's `/health` endpoint
+- Returns `{ status: 'ok'|'down', upstream: {...} }`
+- Polls every 30 seconds in Strategy Lab UI
+
+**Common errors**:
+- **403 S3 access denied**: Instance role missing or lacks S3 permissions
+- **CORS errors**: Set `CORS_ORIGINS` in App Runner environment variables
+- **ML_API_URL blank**: Frontend can't reach ML service; badge shows "ML offline"
+
+**Viewing App Runner logs**:
+- AWS Console → App Runner → Service → Logs tab
+- Or use CloudWatch Logs for detailed traces
+
+**Redeploying**:
+- Push new Docker image to ECR (same tag)
+- App Runner auto-detects and redeploys (if automatic deployments enabled)
+- Or manually trigger deployment in App Runner console
+
+### Environment Variables Summary
+
+**Next.js Frontend (Vercel / local)**:
+```
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+ML_API_URL=https://<apprunner-domain>/
+S3_BASE=https://ai-backtester-data-rosh.s3.amazonaws.com/prod
+```
+
+**ML Service (App Runner)**:
+```
+DATA_BUCKET=ai-backtester-data-rosh
+DATA_PREFIX=prod/
+DATA_LAYOUT=per-symbol
+AWS_REGION=us-east-1
+CORS_ORIGINS=https://<your-vercel-domain>
+```
+
+**Security note**: Do NOT store AWS access keys in environment variables. App Runner uses the instance role for S3 access.
 
 ## 10. Current Status / Known Issues
 
