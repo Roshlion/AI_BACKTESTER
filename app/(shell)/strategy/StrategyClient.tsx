@@ -16,6 +16,9 @@ interface StrategyClientProps {
   end?: string;
 }
 
+type StrategyMode = 'dsl' | 'ml';
+type Health = { status: 'ok' | 'down'; error?: string };
+
 export default function StrategyClient({
   tickers: urlTickers,
   indicators: urlIndicators,
@@ -30,6 +33,10 @@ export default function StrategyClient({
   const initialStart = urlStart || storeStart || "";
   const initialEnd = urlEnd || storeEnd || "";
 
+  // Mode and health state
+  const [mode, setMode] = useState<StrategyMode>('dsl');
+  const [health, setHealth] = useState<Health>({ status: 'down' });
+
   const [availableTickers, setAvailableTickers] = useState<TickerInfo[]>([]);
   const [selectedTickers, setSelectedTickers] = useState<string[]>(initialTickers);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
@@ -41,6 +48,23 @@ export default function StrategyClient({
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // ML health check polling
+  useEffect(() => {
+    let alive = true;
+    const ping = async () => {
+      try {
+        const r = await fetch('/api/ml/health', { cache: 'no-store' });
+        const j = await r.json();
+        if (alive) setHealth(j);
+      } catch {
+        if (alive) setHealth({ status: 'down', error: 'fetch failed' });
+      }
+    };
+    ping();
+    const id = setInterval(ping, 30000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
 
   // Load tickers and check for sector support
   useEffect(() => {
@@ -235,18 +259,56 @@ export default function StrategyClient({
     }
   };
 
+  // Health badge component
+  const healthBadge = (
+    <span
+      className={`ml-3 inline-flex items-center px-2 py-1 rounded text-xs
+      ${health.status === 'ok' ? 'bg-green-700/40 text-green-200' : 'bg-red-700/40 text-red-200'}`}
+      title={health.status === 'ok' ? 'ML service reachable' : (health.error || 'ML service down')}
+      data-testid="ml-health-badge"
+    >
+      {health.status === 'ok' ? 'ML online' : 'ML offline'}
+    </span>
+  );
+
   return (
     <div className="container mx-auto px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Strategy Lab</h1>
-        <p className="text-gray-400">
-          Create and test trading strategies with AI-generated DSL
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center">
+          <h1 className="text-3xl font-bold text-white">Strategy Lab</h1>
+          {healthBadge}
+        </div>
+
+        <div className="inline-flex rounded-lg overflow-hidden border border-gray-700">
+          <button
+            data-testid="tab-dsl"
+            onClick={() => setMode('dsl')}
+            className={`px-4 py-2 text-sm ${mode === 'dsl' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-300 hover:text-white'}`}
+          >
+            DSL
+          </button>
+          <button
+            data-testid="tab-ml"
+            onClick={() => setMode('ml')}
+            className={`px-4 py-2 text-sm ${mode === 'ml' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-300 hover:text-white'}`}
+          >
+            ML
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Panel - Configuration */}
-        <div className="space-y-6">
+      {mode === 'ml' && (
+        <div className="mb-6 bg-yellow-900/30 border border-yellow-700 rounded-lg p-4">
+          <p className="text-yellow-200 text-sm">
+            ML mode is under development. Controls will be {health.status === 'ok' ? 'enabled' : 'disabled'} based on ML service health.
+          </p>
+        </div>
+      )}
+
+      {mode === 'dsl' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Panel - Configuration */}
+          <div className="space-y-6">
           {/* Selected Tickers */}
           <div className="bg-gray-800 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-white mb-4">
@@ -406,6 +468,97 @@ export default function StrategyClient({
             </div>
           )}
         </div>
+      </div>
+      )}
+
+      {mode === 'ml' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">ML Strategy Builder</h3>
+              <textarea
+                placeholder="Describe your ML-based trading strategy..."
+                className="w-full h-32 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 resize-none"
+                disabled={health.status !== 'ok'}
+              />
+              <button
+                className="mt-3 w-full px-4 py-2 rounded bg-blue-600 text-white disabled:bg-gray-600"
+                disabled={health.status !== 'ok'}
+                title={health.status !== 'ok' ? 'ML service offline' : ''}
+              >
+                Generate ML Model
+              </button>
+            </div>
+          </div>
+          <div className="space-y-6">
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Model Output</h3>
+              <div className="bg-gray-700 rounded p-4 h-64 overflow-y-auto">
+                <p className="text-gray-400 text-sm">ML model configuration will appear here...</p>
+              </div>
+              <button
+                className="mt-3 w-full px-4 py-2 rounded bg-green-600 text-white disabled:bg-gray-600"
+                disabled={health.status !== 'ok'}
+                title={health.status !== 'ok' ? 'ML service offline' : ''}
+              >
+                Run ML Backtest
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <HelpSections />
+    </div>
+  );
+}
+
+function HelpSections() {
+  const exampleDsl = [
+    'Momentum cross: Buy when 20 EMA crosses above 50 EMA; sell on cross down.',
+    'RSI mean reversion: Buy RSI<30 with 2% stop; sell RSI>55 or after 10 days.',
+    'MACD trend follow: Enter on MACD>0 & price>200SMA; exit on MACD<0.'
+  ];
+  const exampleMl = [
+    'GradientBoosting on daily OHLCV features with 60-day lookback; predict next-day return.',
+    'RandomForest using RSI/MACD/SMA(20,50) with sector embedding; optimize F1 for "up day".',
+    'XGBoost with engineered volatility & rolling-beta; predict 5-day risk-adjusted return.'
+  ];
+
+  const fill = (text: string) => {
+    const ta = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="Describe your"]');
+    if (ta) {
+      ta.value = text;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+
+  return (
+    <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="bg-gray-800 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-3">Example prompts</h3>
+        <div className="space-y-2">
+          {[...exampleDsl, ...exampleMl].map((p, i) => (
+            <button
+              key={i}
+              onClick={() => fill(p)}
+              className="block w-full text-left px-3 py-2 rounded bg-gray-700 text-gray-100 hover:bg-gray-600 text-sm"
+              data-testid={`example-prompt-${i}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-3">How it works</h3>
+        <ol className="text-gray-300 list-decimal pl-5 space-y-2 text-sm">
+          <li>Describe your idea → we generate either DSL (rules) or ML (model + params).</li>
+          <li>Review and edit: indicators, tickers, dates (auto min/max from selected), hyperparameters.</li>
+          <li>Run: backtester executes DSL; ML service trains/evaluates using Parquet from S3.</li>
+          <li>Inspect outputs: metrics, charts, predictions; iterate quickly.</li>
+        </ol>
       </div>
     </div>
   );

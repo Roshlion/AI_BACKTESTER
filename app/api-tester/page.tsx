@@ -90,6 +90,7 @@ export default function ApiTesterPage() {
   const [loading, setLoading] = useState(false);
   const [smokeResults, setSmokeResults] = useState<TestResult[]>([]);
   const [smokeTesting, setSmokeTesting] = useState(false);
+  const [mlHealth, setMlHealth] = useState<any>(null);
 
   const handlePresetSelect = (preset: typeof API_PRESETS[0]) => {
     setSelectedPreset(preset);
@@ -263,6 +264,31 @@ export default function ApiTesterPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ML Service Health */}
+          <div className="mt-6 bg-gray-800 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-white font-semibold">ML Service</h3>
+              <button
+                className="px-3 py-1 rounded bg-gray-700 text-gray-100 hover:bg-gray-600 text-sm"
+                onClick={async () => {
+                  try {
+                    const r = await fetch('/api/ml/health');
+                    const x = await r.json();
+                    setMlHealth(x);
+                  } catch (err) {
+                    setMlHealth({ error: 'Failed to fetch' });
+                  }
+                }}
+                data-testid="ml-health-refresh"
+              >
+                Check
+              </button>
+            </div>
+            <pre className="mt-3 text-xs text-gray-300 whitespace-pre-wrap overflow-auto max-h-40 bg-gray-900 p-2 rounded">
+              {mlHealth ? JSON.stringify(mlHealth, null, 2) : '—'}
+            </pre>
           </div>
         </div>
       </div>
