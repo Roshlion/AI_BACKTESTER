@@ -23,6 +23,7 @@ export interface StrategyGenerateReq extends DateRange {
 export interface StrategyRunReq extends DateRange {
   mode: StrategyMode;
   tickers: string[];                 // required
-  dsl?: string;                      // DSL mode
-  ml?: { code?: string; hyperparams?: Record<string, any> }; // ML mode
+  dsl?: any;                         // DSL mode - DSL object or string
+  ml?: { code?: string; hyperparams?: Record<string, any>; modelType?: string }; // ML mode
+  portfolio?: any;                   // Portfolio configuration (optional, defaults applied in route)
 }

@@ -8,7 +8,7 @@ import type {
   BacktestResults,
 } from "@/types/portfolio";
 
-interface TickerSignals {
+export interface TickerSignals {
   ticker: string;
   rows: Row[];
   enterSignals: boolean[];

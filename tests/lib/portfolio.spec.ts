@@ -1,6 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { simulatePortfolio } from "@/lib/portfolio";
 import type { PortfolioConfig } from "@/types/portfolio";
+import type { Row } from "@/types/row";
+
+// Helper to create properly typed Row objects
+function createRow(ticker: string, partial: Omit<Row, "ticker" | "timestamp">): Row {
+  return {
+    ...partial,
+    ticker,
+    timestamp: new Date(partial.date).getTime(),
+  };
+}
 
 describe("Portfolio Simulator", () => {
   const mockConfig: PortfolioConfig = {
@@ -25,17 +35,18 @@ describe("Portfolio Simulator", () => {
   });
 
   it("should calculate basic portfolio metrics", () => {
+    const ticker = "AAPL";
     const mockRows = [
-      { date: "2023-01-01", open: 100, high: 105, low: 98, close: 102, volume: 1000 },
-      { date: "2023-01-02", open: 102, high: 108, low: 101, close: 106, volume: 1200 },
-      { date: "2023-01-03", open: 106, high: 110, low: 105, close: 108, volume: 1100 },
-      { date: "2023-01-04", open: 108, high: 112, low: 107, close: 110, volume: 1300 },
-      { date: "2023-01-05", open: 110, high: 115, low: 109, close: 112, volume: 1400 },
+      createRow(ticker, { date: "2023-01-01", open: 100, high: 105, low: 98, close: 102, volume: 1000 }),
+      createRow(ticker, { date: "2023-01-02", open: 102, high: 108, low: 101, close: 106, volume: 1200 }),
+      createRow(ticker, { date: "2023-01-03", open: 106, high: 110, low: 105, close: 108, volume: 1100 }),
+      createRow(ticker, { date: "2023-01-04", open: 108, high: 112, low: 107, close: 110, volume: 1300 }),
+      createRow(ticker, { date: "2023-01-05", open: 110, high: 115, low: 109, close: 112, volume: 1400 }),
     ];
 
     const tickerSignals = [
       {
-        ticker: "AAPL",
+        ticker,
         rows: mockRows,
         enterSignals: [true, false, false, false, false],
         exitSignals: [false, false, false, false, true],
@@ -52,14 +63,15 @@ describe("Portfolio Simulator", () => {
   });
 
   it("should apply commission and slippage correctly", () => {
+    const ticker = "TEST";
     const mockRows = [
-      { date: "2023-01-01", open: 100, high: 105, low: 98, close: 100, volume: 1000 },
-      { date: "2023-01-02", open: 100, high: 102, low: 99, close: 100, volume: 1000 },
+      createRow(ticker, { date: "2023-01-01", open: 100, high: 105, low: 98, close: 100, volume: 1000 }),
+      createRow(ticker, { date: "2023-01-02", open: 100, high: 102, low: 99, close: 100, volume: 1000 }),
     ];
 
     const tickerSignals = [
       {
-        ticker: "TEST",
+        ticker,
         rows: mockRows,
         enterSignals: [true, false],
         exitSignals: [false, true],
@@ -74,18 +86,21 @@ describe("Portfolio Simulator", () => {
   });
 
   it("should calculate risk metrics", () => {
-    const mockRows = Array.from({ length: 50 }, (_, i) => ({
-      date: new Date(2023, 0, i + 1).toISOString().slice(0, 10),
-      open: 100 + Math.random() * 10,
-      high: 110 + Math.random() * 10,
-      low: 90 + Math.random() * 10,
-      close: 100 + Math.random() * 10,
-      volume: 1000,
-    }));
+    const ticker = "VOL";
+    const mockRows = Array.from({ length: 50 }, (_, i) =>
+      createRow(ticker, {
+        date: new Date(2023, 0, i + 1).toISOString().slice(0, 10),
+        open: 100 + Math.random() * 10,
+        high: 110 + Math.random() * 10,
+        low: 90 + Math.random() * 10,
+        close: 100 + Math.random() * 10,
+        volume: 1000,
+      })
+    );
 
     const tickerSignals = [
       {
-        ticker: "VOL",
+        ticker,
         rows: mockRows,
         enterSignals: [true, ...Array(49).fill(false)],
         exitSignals: [...Array(49).fill(false), true],
@@ -105,14 +120,15 @@ describe("Portfolio Simulator", () => {
       sizing: { type: "fixed_dollar", amount: 5000 },
     };
 
+    const ticker = "SIZE";
     const mockRows = [
-      { date: "2023-01-01", open: 100, high: 105, low: 98, close: 100, volume: 1000 },
-      { date: "2023-01-02", open: 100, high: 102, low: 99, close: 110, volume: 1000 },
+      createRow(ticker, { date: "2023-01-01", open: 100, high: 105, low: 98, close: 100, volume: 1000 }),
+      createRow(ticker, { date: "2023-01-02", open: 100, high: 102, low: 99, close: 110, volume: 1000 }),
     ];
 
     const tickerSignals = [
       {
-        ticker: "SIZE",
+        ticker,
         rows: mockRows,
         enterSignals: [true, false],
         exitSignals: [false, true],
