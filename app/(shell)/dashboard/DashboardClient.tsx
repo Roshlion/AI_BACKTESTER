@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Search, MoreHorizontal } from "lucide-react";
 import { MultiTickerChart } from "@/components/MultiTickerChart";
-import { useStrategyStore } from "@/app/store/strategyStore";
 import { formatIndicators, computeMinMaxDates } from "./utils";
 
 interface TickerInfo {
@@ -18,7 +17,6 @@ interface TickerInfo {
 
 export default function DashboardClient() {
   const router = useRouter();
-  const setStrategy = useStrategyStore((state) => state.setStrategy);
 
   const [tickers, setTickers] = useState<TickerInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,13 +155,13 @@ export default function DashboardClient() {
 
   const handleCreateStrategy = () => {
     const indicatorsList = formatIndicators(indicators);
-    setStrategy({
-      tickers: selectedTickers,
-      indicators: indicatorsList,
-      start: dateRange.start || undefined,
-      end: dateRange.end || undefined,
+    const params = new URLSearchParams({
+      tickers: selectedTickers.join(','),
+      ...(indicatorsList.length > 0 && { indicators: indicatorsList.join(',') }),
+      ...(dateRange.start && { start: dateRange.start }),
+      ...(dateRange.end && { end: dateRange.end }),
     });
-    router.push("/strategy");
+    router.push(`/backtester?${params.toString()}`);
   };
 
   const resetDateRange = () => {

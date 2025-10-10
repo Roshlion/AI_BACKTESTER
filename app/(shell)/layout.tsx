@@ -12,7 +12,7 @@ export default function ShellLayout({
 
   const tabs = [
     { href: "/dashboard", label: "Dashboard", path: "/dashboard" },
-    { href: "/strategy", label: "Strategy Lab", path: "/strategy" },
+    { href: "/backtester", label: "Strategy Lab", path: "/backtester" },
     { href: "/explore", label: "Data Warehouse", path: "/explore" },
   ];
 

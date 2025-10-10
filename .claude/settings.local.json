@@ -24,7 +24,11 @@
       "Bash(cat:*)",
       "Bash(pnpm test:*)",
       "Bash(npm test:*)",
-      "Bash(python -m pytest tests/ -v)"
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(rm:*)",
+      "Bash(git rm:*)",
+      "Bash(npm run dev:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []
