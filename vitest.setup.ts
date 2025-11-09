@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import '@testing-library/jest-dom';
 
 process.env.AWS_BUCKET ||= "dummy-bucket";
 process.env.AWS_REGION ||= "us-east-1";

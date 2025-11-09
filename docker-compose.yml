@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  python-service:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - S3_BASE=${S3_BASE}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./python-service/app:/app/app
+    restart: unless-stopped
+
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile.next
+    ports:
+      - "3000:3000"
+    environment:
+      - S3_BASE=${S3_BASE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - ML_API_URL=http://python-service:8081
+      - USE_PY_BACKTESTER=${USE_PY_BACKTESTER:-0}
+    depends_on:
+      - python-service
+    restart: unless-stopped
